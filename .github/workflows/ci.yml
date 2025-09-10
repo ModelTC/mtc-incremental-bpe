@@ -1,0 +1,45 @@
+name: Cargo Build & Test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - beta
+          - nightly
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - run: cargo check --verbose
+      - run: cargo build --verbose
+      - run: cargo test --verbose
+      - run: cargo test --release --verbose
+  rustfmt:
+    name: Check Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: rustup update stable && rustup default stable
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all --check
+  build-docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: rustup update nightly && rustup default nightly
+      - run: cargo +nightly doc --all-features --no-deps
