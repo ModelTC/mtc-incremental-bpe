@@ -9,7 +9,7 @@ documentation = "https://docs.rs/mtc-incremental-bpe"
 authors = ["Chielo Newctle <ChieloNewctle@gmail.com>"]
 
 [package]
-name = "mtc-prefix-bpe"
+name = "mtc-incremental-bpe"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
