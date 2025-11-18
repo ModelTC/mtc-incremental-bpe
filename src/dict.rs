@@ -148,12 +148,15 @@ impl Dictionary {
         self.token_to_rule_ids.get(id).map(|v| v.as_slice())
     }
 
-    pub fn is_proper<F: Fn(&[u8]) -> bool>(&self, is_single: F) -> Result<(), RuleId> {
-        let check = move |rule_id: RuleId, sub_token_id: TokenId| -> bool {
+    pub fn is_proper<F: FnMut(TokenId, &[u8]) -> bool>(
+        &self,
+        mut is_single: F,
+    ) -> Result<(), RuleId> {
+        let mut check = move |rule_id: RuleId, sub_token_id: TokenId| -> bool {
             self.token_to_rule_ids[sub_token_id]
                 .first()
                 .is_some_and(|&sub_rule_id| sub_rule_id < rule_id)
-                || is_single(&self[sub_token_id])
+                || is_single(sub_token_id, &self[sub_token_id])
         };
         for (rule_id, rule) in self.rules.enumerate() {
             if !check(rule_id, rule.pre) || !check(rule_id, rule.suc) {
@@ -164,11 +167,11 @@ impl Dictionary {
     }
 
     pub fn is_proper_in_bytes(&self) -> Result<(), RuleId> {
-        self.is_proper(|b| b.len() == 1)
+        self.is_proper(|_, b| b.len() == 1)
     }
 
     pub fn is_proper_in_utf8(&self) -> Result<(), RuleId> {
-        self.is_proper(|b| {
+        self.is_proper(|_, b| {
             if b.len() > 4 {
                 return false;
             }

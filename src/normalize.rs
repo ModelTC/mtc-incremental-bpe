@@ -25,13 +25,16 @@ pub struct NormalizedDict {
 }
 
 impl NormalizedDict {
-    pub fn new<F: Fn(&[u8]) -> bool>(dict: Dictionary, is_single: F) -> Self {
+    pub fn new<F: FnMut(&Dictionary, TokenId, &[u8]) -> bool>(
+        dict: Dictionary,
+        mut is_single: F,
+    ) -> Self {
         let len = dict.num_of_tokens().as_usize();
         let mut priorities = TypedVec::<TokenId, _>::from(vec![RuleId::MAX; len]);
         let mut useful_rules: BTreeMap<(TokenId, TokenId), RuleId> = Default::default();
 
         for (id, priority) in priorities.enumerate_mut() {
-            if is_single(&dict[id]) {
+            if is_single(&dict, id, &dict[id]) {
                 debug_assert!(id.as_usize() < SINGLETON_PRIORITY.as_usize());
                 let mut p = SINGLETON_PRIORITY;
                 *p.inner_mut() += id.inner();
@@ -101,11 +104,11 @@ impl NormalizedDict {
     }
 
     pub fn new_in_bytes(dict: Dictionary) -> Self {
-        Self::new(dict, |b| b.len() == 1)
+        Self::new(dict, |_, _, b| b.len() == 1)
     }
 
     pub fn new_in_utf8(dict: Dictionary) -> Self {
-        Self::new(dict, |b| {
+        Self::new(dict, |_, _, b| {
             if b.len() > 4 {
                 return false;
             }
