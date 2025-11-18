@@ -209,11 +209,8 @@ mod tests {
         let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
             for i in 0..seq.len() {
                 let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
-                let mut output: Vec<_> = IncBpeTokenChainIter::new(inc_res, i)
-                    .map(|i| i.token_id)
-                    .collect();
-                output.reverse();
-                assert!(output == expected);
+                let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
+                assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
             }
         };
 
@@ -458,11 +455,8 @@ mod tests {
             let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
                 for i in 0..seq.len() {
                     let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
-                    let mut output: Vec<_> = IncBpeTokenChainIter::new(inc_res, i)
-                        .map(|i| i.token_id)
-                        .collect();
-                    output.reverse();
-                    assert!(output == expected);
+                    let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
+                    assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
                 }
             };
             for len in 1..9 {
