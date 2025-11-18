@@ -90,7 +90,7 @@ impl Vocab {
         let unknown_token_id = unknown_token_id.into();
         let seq = seq.as_ref();
         let mut left = 0;
-        let mut res = Vec::new();
+        let mut res = Vec::with_capacity(seq.len());
         for right in 1..seq.len() + 1 {
             if !seq.is_char_boundary(right) {
                 continue;

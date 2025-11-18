@@ -114,7 +114,7 @@ impl ACAutomaton {
     pub fn new(vocab: &Vocab) -> Self {
         let mut trie = ACTrie::default();
 
-        let mut token_to_node = TypedVec::default();
+        let mut token_to_node = TypedVec::with_capacity(vocab.num_of_tokens().as_usize());
 
         for token in vocab.tokens.iter() {
             let mut node = AC_NODE_ROOT;

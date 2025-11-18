@@ -86,7 +86,7 @@ pub fn sentence_piece_impl<const ALLOW_IMPROPER_RULES: bool>(
         }
     }
 
-    let mut res = Vec::new();
+    let mut res = Vec::with_capacity(seq.len().as_usize());
     let mut cur = InputTextPos::ZERO;
     while cur < next_split_pos.len() {
         res.push(seq[cur]);

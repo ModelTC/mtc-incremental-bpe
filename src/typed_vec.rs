@@ -14,20 +14,11 @@ pub(crate) struct TypedVec<I, T> {
     _phantom: PhantomData<I>,
 }
 
-impl<I, T> Default for TypedVec<I, T> {
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
 impl<I, T: Clone> Clone for TypedVec<I, T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            _phantom: Default::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -78,6 +69,13 @@ impl<I: TypedVecIndex, T> TypedVec<I, T> {
 }
 
 impl<I, T> TypedVec<I, T> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(capacity),
+            _phantom: PhantomData,
+        }
+    }
+
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop()
     }
@@ -143,7 +141,7 @@ impl<I, T, C: Into<Vec<T>>> From<C> for TypedVec<I, T> {
     fn from(inner: C) -> Self {
         Self {
             inner: inner.into(),
-            _phantom: Default::default(),
+            _phantom: PhantomData,
         }
     }
 }

@@ -33,7 +33,7 @@ pub(crate) struct SucForest {
 
 impl SucForest {
     pub fn new(dict: &NormalizedDict) -> Self {
-        let mut roots = Vec::new();
+        let mut roots = Vec::with_capacity(NUM_INLINE_FOREST_NODES);
         let mut children: TypedVec<TokenId, _> = std::iter::repeat_n(
             SmallVec::<[TokenId; NUM_INLINE_FOREST_NODES]>::new(),
             dict.num_of_tokens().as_usize(),
