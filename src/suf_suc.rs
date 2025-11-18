@@ -157,7 +157,7 @@ impl SufSucNodeSet {
                     continue;
                 }
                 let node = &forest[node_id];
-                let mut ranges = Vec::new();
+                let mut ranges = Vec::with_capacity(node.children.len());
                 for &child_id in &node.children {
                     let child = &nodes[child_id];
                     ranges.push(child.valid_range);
@@ -231,7 +231,7 @@ mod tests {
         let node_set = SufSucNodeSet::new(&forest, &automaton);
 
         let mut stack = vec![(AC_NODE_ROOT, automaton.children(AC_NODE_ROOT))];
-        let mut cur_string = Vec::new();
+        let mut cur_string = Vec::with_capacity(dict.tokens.iter().map(|t| t.len()).max().unwrap());
         eprintln!("{:?}", automaton.token_to_node);
         while let Some((ac_node_id, child_iter)) = stack.last_mut() {
             let ac_node_id = *ac_node_id;

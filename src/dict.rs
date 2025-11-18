@@ -65,17 +65,14 @@ impl Dictionary {
         vocab: Vocab,
         rule_iter: R,
     ) -> Result<Self, DictBuildError> {
-        let mut rules = TypedVec::default();
+        let rule_iter = rule_iter.into_iter();
+        let mut rules = TypedVec::with_capacity(rule_iter.size_hint().0);
         let get_token = |pos, id| {
             vocab
                 .get_token(id)
                 .ok_or(DictBuildError::UnknownTokenId { pos, token_id: id })
         };
-        for (pos, (left, right)) in rule_iter
-            .into_iter()
-            .map(|(i, j)| (i.into(), j.into()))
-            .enumerate()
-        {
+        for (pos, (left, right)) in rule_iter.map(|(i, j)| (i.into(), j.into())).enumerate() {
             let pos = RuleId::from(pos);
             let token = {
                 let mut buf = BytesMut::from(get_token(pos, left)?.clone());
@@ -101,7 +98,8 @@ impl Dictionary {
         vocab: Vocab,
         rule_iter: R,
     ) -> Result<Self, DictBuildError> {
-        let mut rules = TypedVec::default();
+        let rule_iter = rule_iter.into_iter();
+        let mut rules = TypedVec::with_capacity(rule_iter.size_hint().0);
         let get_id = |pos, token: &[u8]| {
             vocab
                 .get_token_id(token)
@@ -110,7 +108,7 @@ impl Dictionary {
                     token: UnknownToken(token.to_owned().into()),
                 })
         };
-        for (pos, (left, right)) in rule_iter.into_iter().enumerate() {
+        for (pos, (left, right)) in rule_iter.enumerate() {
             let (left, right) = (left.as_ref(), right.as_ref());
             let pos = RuleId::from(pos);
             let left_id = get_id(pos, left)?;

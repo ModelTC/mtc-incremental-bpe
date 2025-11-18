@@ -29,7 +29,7 @@ impl CentroidNode {
     }
 }
 
-#[derive(Debug, Default, Deref)]
+#[derive(Debug, Deref)]
 pub(crate) struct SufSucCentroidTree {
     nodes: TypedVec<CentroidId, CentroidNode>,
 }
@@ -71,11 +71,13 @@ struct SubTreeNode<'a> {
 impl SufSucCentroidTree {
     pub fn new(start: ForestNodeId, node_set: &SufSucNodeSet, forest: &SucForest) -> Self {
         if start == FOREST_VIRTUAL_ROOT {
-            return Self::default();
+            return Self {
+                nodes: TypedVec::with_capacity(0),
+            };
         }
 
         let mut subtree = {
-            let mut pool = Vec::new();
+            let mut pool = Vec::with_capacity(NUM_INLINE_FOREST_NODES);
             let mut cursor = start;
             while cursor != FOREST_VIRTUAL_ROOT {
                 let forest_node = &forest[cursor];
@@ -91,7 +93,7 @@ impl SufSucCentroidTree {
 
             let mut forest_to_node_id = BTreeMap::new();
 
-            let mut nodes = TypedVec::<SubTreeNodeId, _>::default();
+            let mut nodes = TypedVec::<SubTreeNodeId, _>::with_capacity(pool.len());
             for node in pool {
                 let forest_id = node.suf_suc_node.forest_id;
                 if node.parent == FOREST_VIRTUAL_ROOT {
@@ -129,7 +131,7 @@ impl SufSucCentroidTree {
         };
 
         let mut roots = vec![(SubTreeNodeId::ZERO, None::<CentroidId>)];
-        let mut centroids = TypedVec::<CentroidId, _>::default();
+        let mut centroids = TypedVec::<CentroidId, _>::with_capacity(subtree.len().as_usize());
 
         while let Some((root_id, parent_centroid)) = roots.pop() {
             let half_size = subtree[root_id].size / 2;
