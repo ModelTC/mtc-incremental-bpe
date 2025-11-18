@@ -89,7 +89,7 @@ impl SufSucCentroidTree {
                 cursor = node_set.suffix_parent[cursor];
             }
             pool.reverse();
-            debug_assert!(pool[0].parent == FOREST_VIRTUAL_ROOT);
+            debug_assert_eq!(pool[0].parent, FOREST_VIRTUAL_ROOT);
 
             let mut forest_to_node_id = BTreeMap::new();
 
@@ -123,7 +123,7 @@ impl SufSucCentroidTree {
                     nodes[parent].size += node.size;
                     debug_assert!(parent < id);
                 } else {
-                    debug_assert!(id == SubTreeNodeId::ZERO);
+                    debug_assert_eq!(id, SubTreeNodeId::ZERO);
                 }
             }
 
@@ -319,15 +319,14 @@ mod tests {
                 continue;
             }
             let token = &dict[forest[id].token_id];
-            assert!(
-                dict.tokens.iter().filter(|i| token.ends_with(i)).count() == tree.len().as_usize()
-            );
+            let num_valid_tokens = dict.tokens.iter().filter(|i| token.ends_with(i)).count();
+            assert_eq!(num_valid_tokens, tree.len().as_usize());
             for u in tree.keys() {
                 let v = u.next();
                 if v >= tree.len() {
                     continue;
                 }
-                assert!(tree[u].forest_id != tree[v].forest_id);
+                assert_ne!(tree[u].forest_id, tree[v].forest_id);
                 let is_parent = {
                     let mut w = forest[tree[u].forest_id].parent;
                     while w != FOREST_VIRTUAL_ROOT && w != tree[v].forest_id {
@@ -335,8 +334,6 @@ mod tests {
                     }
                     w == tree[v].forest_id
                 };
-                dbg!(u, &tree[u]);
-                dbg!(v, &tree[v]);
                 assert!(is_parent ^ (tree[v].depth >= tree[u].depth));
             }
         }

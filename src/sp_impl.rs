@@ -55,7 +55,8 @@ pub fn sentence_piece_impl<const ALLOW_IMPROPER_RULES: bool>(
 
         debug_assert!(prev_pos < pos && pos < next_pos);
 
-        debug_assert!(seq[prev_pos] == rule.pre && seq[pos] == rule.suc);
+        debug_assert_eq!(seq[prev_pos], rule.pre);
+        debug_assert_eq!(seq[pos], rule.suc);
 
         seq[prev_pos] = rule.merged;
 
@@ -112,10 +113,8 @@ mod tests {
         tokens: T,
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        assert_eq!(
-            sentence_piece_impl::<true>(dict, dict.split_bytes_to_tokens(seq.as_ref(), 0usize)),
-            tokens,
-        );
+        let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
+        assert_eq!(sentence_piece_impl::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_bytes().is_ok());
         check_properly_in_bytes(dict, seq, tokens);
     }
@@ -126,10 +125,8 @@ mod tests {
         tokens: T,
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        assert_eq!(
-            sentence_piece_impl::<true>(dict, dict.split_utf8_to_tokens(seq.as_ref(), 0usize)),
-            tokens,
-        );
+        let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
+        assert_eq!(sentence_piece_impl::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_utf8().is_ok());
         check_properly_in_utf8(dict, seq, tokens);
     }
@@ -139,10 +136,9 @@ mod tests {
         seq: S,
         tokens: T,
     ) {
-        assert_eq!(
-            sentence_piece_impl::<false>(dict, dict.split_bytes_to_tokens(seq.as_ref(), 0usize)),
-            tokens.into_iter().map(I::into).collect::<Vec<_>>()
-        );
+        let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
+        let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
+        assert_eq!(sentence_piece_impl::<false>(dict, inputs), tokens);
     }
 
     fn check_properly_in_utf8<S: AsRef<str>, I: Into<TokenId>, T: IntoIterator<Item = I>>(
@@ -150,10 +146,9 @@ mod tests {
         seq: S,
         tokens: T,
     ) {
-        assert_eq!(
-            sentence_piece_impl::<false>(dict, dict.split_utf8_to_tokens(seq.as_ref(), 0usize)),
-            tokens.into_iter().map(I::into).collect::<Vec<_>>()
-        );
+        let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
+        let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
+        assert_eq!(sentence_piece_impl::<false>(dict, inputs), tokens);
     }
 
     #[test]
@@ -192,10 +187,8 @@ mod tests {
         );
         check_in_bytes(&dict, "你好", [8_u32, 0, 0, 15]);
         check_properly_in_utf8(&dict, "你好", [8_u32, 9]);
-        assert_eq!(
-            dict.split_utf8_to_tokens("你好", 0usize),
-            [8, 9].map(TokenId::new)
-        );
+        let output = dict.split_utf8_to_tokens("你好", 0usize);
+        assert_eq!(output, [8, 9].map(TokenId::new));
 
         let dict = build_dict(&vocab, [("你", "好")]);
         check_in_utf8(&dict, "你好", [11_u32]);

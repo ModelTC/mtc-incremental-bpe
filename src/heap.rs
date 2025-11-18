@@ -201,7 +201,7 @@ mod tests {
             if node_id.is_nil() {
                 continue;
             }
-            assert!(nodes[node_id].1 == pos);
+            assert_eq!(nodes[node_id].1, pos);
         }
         for (node_id, (rule_id, pos)) in nodes.enumerate_copied() {
             if node_id.is_nil() {
@@ -219,7 +219,7 @@ mod tests {
             if right < nodes.len() {
                 assert!(rule_id <= nodes[right].0);
             }
-            assert!(pos_to_node_id[pos] == node_id);
+            assert_eq!(pos_to_node_id[pos], node_id);
         }
     }
 

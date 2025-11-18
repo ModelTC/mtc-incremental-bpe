@@ -128,12 +128,9 @@ impl SucForest {
 
             #[cfg(debug_assertions)]
             {
-                debug_assert!(
-                    nodes[node_id]
-                        .children
-                        .is_sorted_by_key(|&c| !nodes[c].priority)
-                );
-                for slice in nodes[node_id].children.windows(2) {
+                let node = &nodes[node_id];
+                debug_assert!(node.children.is_sorted_by_key(|&c| !nodes[c].priority));
+                for slice in node.children.windows(2) {
                     let u = slice[0];
                     let v = slice[1];
                     debug_assert!(u < v && nodes[u].priority > nodes[v].priority);
@@ -170,16 +167,16 @@ impl SucForest {
         } {
             let node_id = token_to_node_id[token_id];
             if !dict.is_useful(token_id) {
-                debug_assert!(node_id == FOREST_VIRTUAL_ROOT);
+                debug_assert_eq!(node_id, FOREST_VIRTUAL_ROOT);
                 continue;
             }
-            debug_assert!(node_id != FOREST_VIRTUAL_ROOT);
+            debug_assert_ne!(node_id, FOREST_VIRTUAL_ROOT);
             let node = &nodes[node_id];
             let (pre_id, parent) = (node.pre_id, node.parent);
             if node.parent == FOREST_VIRTUAL_ROOT {
                 continue;
             }
-            debug_assert!(node.pre_id != FOREST_VIRTUAL_ROOT);
+            debug_assert_ne!(node.pre_id, FOREST_VIRTUAL_ROOT);
             nodes[node_id].skip_len = nodes[pre_id].skip_len + nodes[parent].skip_len;
         }
 
@@ -223,90 +220,61 @@ mod tests {
             b"g",
         ])
         .unwrap();
-        let dict = Dictionary::new_from_token_pair(
-            vocab.clone(),
-            [
-                ("b", "c"),
-                ("e", "f"),
-                ("d", "e"),
-                ("c", "d"),
-                ("d", "ef"),
-                ("b", "a"),
-                ("a", "bc"),
-                ("abc", "de"),
-                ("abc", "def"),
-                ("bc", "def"),
-                ("c", "de"),
-                ("ef", "g"),
-                ("cd", "efg"),
-            ],
-        )
-        .unwrap();
-        let normalized = NormalizedDict::new_in_bytes(dict.clone());
-        let forest = SucForest::new(&normalized);
-        for (node_id, node) in forest.enumerate() {
-            if node_id != FOREST_VIRTUAL_ROOT && node.token_id.inner() > 0 {
-                assert!(vocab[node.token_id].len() == node.skip_len as usize);
+
+        let validate = |rules: &[(&str, &str)]| {
+            let dict =
+                Dictionary::new_from_token_pair(vocab.clone(), rules.iter().copied()).unwrap();
+            let normalized = NormalizedDict::new_in_bytes(dict.clone());
+            let forest = SucForest::new(&normalized);
+            for (node_id, node) in forest.enumerate() {
+                if node_id != FOREST_VIRTUAL_ROOT && node.token_id.inner() > 0 {
+                    assert_eq!(vocab[node.token_id].len(), node.skip_len as usize);
+                }
+                let s = if node_id.0 == 0 {
+                    "(epsilon)"
+                } else {
+                    std::str::from_utf8(&vocab[node.token_id]).unwrap()
+                };
+                println!("{s:12} {node_id:2}: {node:?}");
             }
-            let s = if node_id.0 == 0 {
-                "(epsilon)"
-            } else {
-                std::str::from_utf8(&vocab[node.token_id]).unwrap()
-            };
-            println!("{s:12} {node_id:2}: {node:?}");
-        }
-        let normalized = NormalizedDict::new_in_utf8(dict.clone());
-        let forest_b = SucForest::new(&normalized);
-        assert!(
-            forest
-                .token_to_node_id
-                .iter()
-                .zip(forest_b.token_to_node_id.iter())
-                .all(|(&i, &j)| i == j)
-        );
-        assert!(forest.iter().zip(forest_b.iter()).all(|(i, j)| i == j));
-        let dict = Dictionary::new_from_token_pair(
-            vocab.clone(),
-            [
-                ("b", "c"),
-                ("e", "f"),
-                ("d", "e"),
-                ("c", "d"),
-                ("d", "ef"),
-                ("a", "bc"),
-                ("b", "a"),
-                ("abc", "de"),
-                ("abc", "def"),
-                ("bc", "def"),
-                ("c", "de"),
-                ("ef", "g"),
-                ("cd", "efg"),
-            ],
-        )
-        .unwrap();
-        let normalized = NormalizedDict::new_in_bytes(dict.clone());
-        let forest = SucForest::new(&normalized);
-        for (node_id, node) in forest.enumerate() {
-            if node_id != FOREST_VIRTUAL_ROOT && node.token_id.inner() > 0 {
-                assert!(vocab[node.token_id].len() == node.skip_len as usize);
-            }
-            let s = if node_id.0 == 0 {
-                "(epsilon)"
-            } else {
-                std::str::from_utf8(&vocab[node.token_id]).unwrap()
-            };
-            println!("{s:12} {node_id:2}: {node:?}");
-        }
-        let normalized = NormalizedDict::new_in_utf8(dict.clone());
-        let forest_b = SucForest::new(&normalized);
-        assert!(
-            forest
-                .token_to_node_id
-                .iter()
-                .zip(forest_b.token_to_node_id.iter())
-                .all(|(&i, &j)| i == j)
-        );
-        assert!(forest.iter().zip(forest_b.iter()).all(|(i, j)| i == j));
+            let normalized = NormalizedDict::new_in_utf8(dict.clone());
+            let forest_b = SucForest::new(&normalized);
+
+            assert_eq!(forest.token_to_node_id, forest_b.token_to_node_id);
+            assert_eq!(forest.as_slice(), forest_b.as_slice());
+        };
+
+        validate(&[
+            ("b", "c"),
+            ("e", "f"),
+            ("d", "e"),
+            ("c", "d"),
+            ("d", "ef"),
+            ("b", "a"),
+            ("a", "bc"),
+            ("abc", "de"),
+            ("abc", "def"),
+            ("bc", "def"),
+            ("c", "de"),
+            ("ef", "g"),
+            ("cd", "efg"),
+        ]);
+
+        validate(&[
+            ("b", "c"),
+            ("e", "f"),
+            ("d", "e"),
+            ("c", "d"),
+            ("d", "ef"),
+            ("a", "bc"),
+            ("b", "a"),
+            ("abc", "de"),
+            ("abc", "def"),
+            ("bc", "def"),
+            ("c", "de"),
+            ("ef", "g"),
+            ("cd", "efg"),
+        ]);
 
         let dict = Dictionary::new_from_token_pair(
             vocab.clone(),
