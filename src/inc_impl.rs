@@ -10,6 +10,12 @@ use crate::{
     suf_suc::SufSucNodeSet,
 };
 
+#[derive(Clone, Copy, Debug, Into, From, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IncBpeToken {
+    pub token_id: TokenId,
+    pub skip_len: u32,
+}
+
 #[derive(Debug, Deref)]
 pub struct IncBpeTokenizer {
     #[deref]
@@ -20,10 +26,10 @@ pub struct IncBpeTokenizer {
     trees: SufSucCentroidTrees,
 }
 
-#[derive(Clone, Copy, Debug, Constructor, Into, From, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IncBpeToken {
-    pub token_id: TokenId,
-    pub skip_len: u32,
+#[derive(Clone, Debug, Constructor, Into, From)]
+pub struct IncBpeTokenChainIter<S> {
+    seq: S,
+    pos: usize,
 }
 
 #[derive(Debug)]
@@ -34,10 +40,13 @@ pub struct IncBpeTokenization<T> {
     ac_state: ACNodeId,
 }
 
-#[derive(Clone, Debug, Constructor, Into, From)]
-pub struct IncBpeTokenChainIter<'s> {
-    seq: &'s [IncBpeToken],
-    pos: usize,
+impl IncBpeToken {
+    pub fn new<I: Into<TokenId>>(token_id: I, skip_len: u32) -> Self {
+        Self {
+            token_id: token_id.into(),
+            skip_len,
+        }
+    }
 }
 
 impl IncBpeTokenizer {
@@ -70,6 +79,26 @@ impl IncBpeTokenizer {
     }
 }
 
+impl<S: Borrow<[IncBpeToken]>> Iterator for IncBpeTokenChainIter<S> {
+    type Item = IncBpeToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let seq: &[IncBpeToken] = self.seq.borrow();
+        if self.pos >= seq.len() {
+            return None;
+        }
+        let token = seq[self.pos];
+        let skip_len = token.skip_len as usize;
+        if skip_len <= self.pos {
+            self.pos -= skip_len;
+        } else {
+            debug_assert_eq!(skip_len, self.pos + 1);
+            self.pos = seq.len();
+        }
+        Some(token)
+    }
+}
+
 impl<T> IncBpeTokenization<T> {
     pub fn new(tokenizer: T) -> Self {
         Self {
@@ -83,7 +112,7 @@ impl<T> IncBpeTokenization<T> {
 
 impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
     pub fn feed(&mut self, token_id: TokenId) -> IncBpeToken {
-        let tokenizer = self.tokenizer.borrow();
+        let tokenizer: &IncBpeTokenizer = self.tokenizer.borrow();
         let (token, node_id) = if let Some(token) = tokenizer.get_token(token_id)
             && tokenizer.is_useful(token_id)
         {
@@ -134,39 +163,22 @@ impl<T> IncBpeTokenization<T> {
         self.forest_ids.reserve(additional);
     }
 
-    pub fn token_chain(&self, end_pos: usize) -> IncBpeTokenChainIter<'_> {
+    pub fn token_chain(&self, end_pos: usize) -> IncBpeTokenChainIter<&[IncBpeToken]> {
         IncBpeTokenChainIter::new(&self.tokens, end_pos)
     }
 
-    pub fn current_token_seq(&self) -> IncBpeTokenChainIter<'_> {
+    pub fn current_token_seq(&self) -> IncBpeTokenChainIter<&[IncBpeToken]> {
         self.token_chain(self.tokens.len().saturating_sub(1))
-    }
-}
-
-impl<'s> Iterator for IncBpeTokenChainIter<'s> {
-    type Item = IncBpeToken;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.seq.len() {
-            return None;
-        }
-        let token = self.seq[self.pos];
-        let skip_len = token.skip_len as usize;
-        if skip_len <= self.pos {
-            self.pos -= skip_len;
-        } else {
-            debug_assert_eq!(skip_len, self.pos + 1);
-            self.pos = self.seq.len();
-        }
-        Some(token)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{borrow::Borrow, sync::Arc};
+
     use crate::{
-        Dictionary, IncBpeToken, IncBpeTokenizer, NormalizedDict, TokenId, Vocab,
-        inc_impl::IncBpeTokenChainIter, sp_impl::sentence_piece_impl,
+        Dictionary, IncBpeToken, IncBpeTokenChainIter, IncBpeTokenizer, NormalizedDict, TokenId,
+        Vocab, sp_impl::sentence_piece_impl,
     };
 
     fn inc_bpe_short_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
@@ -553,5 +565,51 @@ mod tests {
             ("ef", "g"),
             ("cd", "efg"),
         ]);
+    }
+
+    fn verify_chain_iter(
+        chain: impl Borrow<[IncBpeToken]> + Clone,
+        seqs: impl IntoIterator<Item = impl IntoIterator<Item = impl Into<TokenId>>>,
+    ) {
+        for (end_pos, seq) in seqs.into_iter().enumerate() {
+            let expected: Vec<_> = seq.into_iter().map(|i| i.into()).collect();
+            let iter = IncBpeTokenChainIter::new(chain.clone(), end_pos);
+            let output: Vec<_> = iter.map(|i| i.token_id).collect();
+            assert_eq!(output, expected);
+        }
+    }
+
+    #[test]
+    fn test_inc_bpe_chain_iter_box() {
+        let chain_base = [
+            IncBpeToken::new(1u32, 1),
+            IncBpeToken::new(2u32, 1),
+            IncBpeToken::new(3u32, 2),
+            IncBpeToken::new(4u32, 2),
+            IncBpeToken::new(5u32, 1),
+            IncBpeToken::new(6u32, 3),
+        ];
+
+        let expected = [
+            &[1u32] as &[u32],
+            &[2, 1],
+            &[3, 1],
+            &[4, 2, 1],
+            &[5, 4, 2, 1],
+            &[6, 3, 1],
+        ];
+        let build_seq = || expected.iter().map(|&s| s.iter().copied());
+
+        verify_chain_iter(&chain_base as &[IncBpeToken], build_seq());
+        verify_chain_iter(chain_base, build_seq());
+
+        let chain: Vec<IncBpeToken> = Vec::from(chain_base);
+        verify_chain_iter(chain, build_seq());
+
+        let chain: Box<[IncBpeToken]> = Box::from(chain_base);
+        verify_chain_iter(chain, build_seq());
+
+        let chain: Arc<[IncBpeToken]> = Arc::from(chain_base);
+        verify_chain_iter(chain, build_seq());
     }
 }
