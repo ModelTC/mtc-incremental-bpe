@@ -24,6 +24,32 @@ pub enum VocabBuildError {
 }
 
 impl Vocab {
+    pub fn new<T: Into<Token>, I: IntoIterator<Item = T>>(
+        iter: I,
+    ) -> Result<Self, VocabBuildError> {
+        let mut token_to_id = HashMap::new();
+        let tokens: TypedVec<_, _> = iter
+            .into_iter()
+            .enumerate()
+            .map(|(k, token)| {
+                let token = token.into();
+                let id = TokenId::from(k);
+                if token.is_empty() {
+                    Err(VocabBuildError::EmptyToken { id })
+                } else if let Some(other) = token_to_id.insert(token.clone(), id) {
+                    Err(VocabBuildError::Duplicated { a: other, b: id })
+                } else {
+                    Ok(token)
+                }
+            })
+            .collect::<Result<_, _>>()?;
+        debug_assert!(tokens.as_slice().len() == token_to_id.len());
+        Ok(Self {
+            tokens,
+            token_to_id,
+        })
+    }
+
     pub fn get_token_id<T: AsRef<[u8]>>(&self, token: T) -> Option<TokenId> {
         self.token_to_id.get(token.as_ref()).copied()
     }
@@ -77,32 +103,6 @@ impl Vocab {
         }
         debug_assert!(res.len() == seq.chars().count());
         res
-    }
-
-    pub fn new<T: Into<Token>, I: IntoIterator<Item = T>>(
-        iter: I,
-    ) -> Result<Self, VocabBuildError> {
-        let mut token_to_id = HashMap::new();
-        let tokens: TypedVec<_, _> = iter
-            .into_iter()
-            .enumerate()
-            .map(|(k, token)| {
-                let token = token.into();
-                let id = TokenId::from(k);
-                if token.is_empty() {
-                    Err(VocabBuildError::EmptyToken { id })
-                } else if let Some(other) = token_to_id.insert(token.clone(), id) {
-                    Err(VocabBuildError::Duplicated { a: other, b: id })
-                } else {
-                    Ok(token)
-                }
-            })
-            .collect::<Result<_, _>>()?;
-        debug_assert!(tokens.as_slice().len() == token_to_id.len());
-        Ok(Self {
-            tokens,
-            token_to_id,
-        })
     }
 }
 
