@@ -27,6 +27,14 @@ impl<I, T: Clone> Clone for TypedVec<I, T> {
     }
 }
 
+impl<I, T: PartialEq> PartialEq for TypedVec<I, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<I, T: Eq> Eq for TypedVec<I, T> {}
+
 impl<I: TypedVecIndex, T> TypedVec<I, T> {
     pub fn push(&mut self, val: T) -> I {
         let len = self.len();

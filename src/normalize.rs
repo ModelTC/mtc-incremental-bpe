@@ -21,7 +21,7 @@ pub struct NormalizedDict {
     dict: Dictionary,
     pub(crate) priorities: TypedVec<TokenId, RuleId>,
     #[cfg(test)]
-    useful_rules: BTreeMap<(TokenId, TokenId), RuleId>,
+    pub(crate) useful_rules: BTreeMap<(TokenId, TokenId), RuleId>,
 }
 
 impl NormalizedDict {
@@ -88,7 +88,8 @@ impl NormalizedDict {
                 if right < SINGLETON_PRIORITY {
                     right = priorities[v];
                 }
-                debug_assert!(left != RuleId::MAX && right != RuleId::MAX);
+                debug_assert_ne!(left, RuleId::MAX);
+                debug_assert_ne!(right, RuleId::MAX);
             }
             priorities[rule.merged] = id;
             let res = useful_rules.insert((rule.pre, rule.suc), id);

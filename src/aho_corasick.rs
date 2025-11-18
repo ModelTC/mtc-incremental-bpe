@@ -98,6 +98,7 @@ impl ACTrie {
 
     pub fn children(&self, id: ACNodeId) -> impl Iterator<Item = (ACNodeId, u8)> {
         let node = &self.nodes[id];
+        debug_assert_eq!(node.children.len(), node.keys.len());
         node.children.iter().copied().zip(node.keys.iter().copied())
     }
 }
@@ -147,7 +148,7 @@ impl ACAutomaton {
                 ]);
             for (cur, suf) in suffix.enumerate_copied() {
                 if cur == suf {
-                    debug_assert!(cur == AC_NODE_ROOT);
+                    debug_assert_eq!(cur, AC_NODE_ROOT);
                     continue;
                 }
                 suffix_children[suf].push(cur);
@@ -221,7 +222,7 @@ mod tests {
         for node in automaton.nodes.keys() {
             let suffix = automaton.suffix[node];
             let children: Vec<_> = automaton.children(node).collect();
-            println!("{node:2}: {suffix:2}, {children:?}");
+            println!("{node:2} {suffix:2}: {children:?}");
         }
         for (id, token) in vocab.tokens.enumerate() {
             let node = automaton.token_to_node[id];

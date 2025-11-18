@@ -43,7 +43,7 @@ impl Vocab {
                 }
             })
             .collect::<Result<_, _>>()?;
-        debug_assert!(tokens.as_slice().len() == token_to_id.len());
+        debug_assert_eq!(tokens.as_slice().len(), token_to_id.len());
         Ok(Self {
             tokens,
             token_to_id,
@@ -54,8 +54,8 @@ impl Vocab {
         self.token_to_id.get(token.as_ref()).copied()
     }
 
-    pub fn get_token(&self, id: TokenId) -> Option<&Token> {
-        self.tokens.get(id)
+    pub fn get_token<T: Into<TokenId>>(&self, id: T) -> Option<&Token> {
+        self.tokens.get(id.into())
     }
 
     pub fn num_of_tokens(&self) -> TokenId {
@@ -101,7 +101,7 @@ impl Vocab {
             );
             left = right;
         }
-        debug_assert!(res.len() == seq.chars().count());
+        debug_assert_eq!(res.len(), seq.chars().count());
         res
     }
 }
@@ -135,22 +135,13 @@ mod tests {
         assert_eq!(vocab.get_token_id(b"e"), None);
         assert_eq!(vocab.get_token_id(b"random"), None);
 
-        assert!(
-            vocab
-                .get_token(0_u32.into())
-                .is_some_and(|t| t.as_ref() == b"a")
-        );
-        assert!(
-            vocab
-                .get_token(3_u32.into())
-                .is_some_and(|t| t.as_ref() == b"d")
-        );
-        assert!(
-            vocab
-                .get_token(6_u32.into())
-                .is_some_and(|t| t.as_ref() == b"abcd")
-        );
-        assert!(vocab.get_token(7_u32.into()).is_none());
+        let check_token = |id: u32, e: &str| {
+            assert_eq!(vocab.get_token(id).map(|b| b.as_ref()), Some(e.as_bytes()));
+        };
+        check_token(0, "a");
+        check_token(3, "d");
+        check_token(6, "abcd");
+        assert!(vocab.get_token(7u32).is_none());
     }
 
     #[test]
@@ -175,17 +166,17 @@ mod tests {
         ])
         .unwrap();
 
+        let expected = [
+            12,
+            13,
+            14,
+            vocab.num_of_tokens().inner(),
+            vocab.num_of_tokens().inner(),
+            13,
+        ];
         assert_eq!(
             vocab.split_bytes_to_tokens("你好", vocab.num_of_tokens()),
-            [
-                12,
-                13,
-                14,
-                vocab.num_of_tokens().inner(),
-                vocab.num_of_tokens().inner(),
-                13,
-            ]
-            .map(TokenId::new),
+            expected.map(TokenId::new),
         );
 
         assert_eq!(

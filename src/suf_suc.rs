@@ -141,15 +141,13 @@ impl SufSucNodeSet {
             for (i, node) in nodes.enumerate() {
                 let parent = forest[i].parent;
                 if parent == i {
-                    debug_assert!(i == FOREST_VIRTUAL_ROOT);
+                    debug_assert_eq!(i, FOREST_VIRTUAL_ROOT);
                 } else {
-                    debug_assert!(node.depth == forest[parent].depth + 1);
+                    debug_assert_eq!(node.depth, forest[parent].depth + 1);
                 }
-                debug_assert!(
-                    node.forest_id == i
-                        && node.skip_len == forest[i].skip_len
-                        && node.suc_skip_len == forest[parent].skip_len
-                );
+                debug_assert_eq!(node.forest_id, i);
+                debug_assert_eq!(node.skip_len, forest[i].skip_len);
+                debug_assert_eq!(node.suc_skip_len, forest[parent].skip_len);
             }
 
             for node_id in nodes.keys() {
@@ -232,7 +230,7 @@ mod tests {
 
         let mut stack = vec![(AC_NODE_ROOT, automaton.children(AC_NODE_ROOT))];
         let mut cur_string = Vec::with_capacity(dict.tokens.iter().map(|t| t.len()).max().unwrap());
-        eprintln!("{:?}", automaton.token_to_node);
+        println!("{:?}", automaton.token_to_node);
         while let Some((ac_node_id, child_iter)) = stack.last_mut() {
             let ac_node_id = *ac_node_id;
             let Some((child, byte)) = child_iter.next() else {
@@ -251,13 +249,13 @@ mod tests {
                 .max_by_key(|&i| dict[i].len())
                 .map(|i| forest.token_to_node_id[i])
                 .unwrap_or(FOREST_VIRTUAL_ROOT);
-            eprintln!("{child}: {:?} {longest}", str::from_utf8(&cur_string));
-            assert!(node_set.longest_token_node[child] == longest);
+            println!("{child}: {:?} {longest}", str::from_utf8(&cur_string));
+            assert_eq!(node_set.longest_token_node[child], longest);
         }
 
         for (token_id, ac_node_id) in automaton.token_to_node.enumerate_copied() {
             let node_id = forest.token_to_node_id[token_id];
-            assert!(node_set.longest_token_node[ac_node_id] == node_id);
+            assert_eq!(node_set.longest_token_node[ac_node_id], node_id);
             let token = dict.get_token(token_id).unwrap();
             let suf_parent_id = dict
                 .tokens
@@ -266,8 +264,8 @@ mod tests {
                 .max_by_key(|&i| dict[i].len())
                 .map(|i| forest.token_to_node_id[i])
                 .unwrap_or(FOREST_VIRTUAL_ROOT);
-            eprintln!("{node_id}: {}", node_set.suffix_parent[node_id]);
-            assert!(node_set.suffix_parent[node_id] == suf_parent_id);
+            println!("{node_id}: {}", node_set.suffix_parent[node_id]);
+            assert_eq!(node_set.suffix_parent[node_id], suf_parent_id);
         }
     }
 

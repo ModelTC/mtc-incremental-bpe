@@ -87,9 +87,11 @@ impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
         let (token, node_id) = if let Some(token) = tokenizer.get_token(token_id)
             && tokenizer.is_useful(token_id)
         {
-            debug_assert!(
-                tokenizer.forest[tokenizer.forest.token_to_node_id[token_id]].skip_len == 1
-            );
+            #[cfg(debug_assertions)]
+            {
+                let node_id = tokenizer.forest.token_to_node_id[token_id];
+                debug_assert_eq!(tokenizer.forest[node_id].skip_len, 1);
+            }
             self.ac_state = tokenizer.automaton.feed(self.ac_state, token);
             let skip_to = |skip| {
                 let len = self.forest_ids.len();
@@ -100,7 +102,7 @@ impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
                 }
             };
             let mut forest_id = tokenizer.node_set.longest_token_node[self.ac_state];
-            debug_assert!(forest_id != FOREST_VIRTUAL_ROOT);
+            debug_assert_ne!(forest_id, FOREST_VIRTUAL_ROOT);
             let node = &tokenizer.node_set[forest_id];
             if (node.skip_len as usize) <= self.tokens.len() && !node.verify(skip_to) {
                 let tree = &tokenizer.trees[forest_id];
@@ -153,7 +155,7 @@ impl<'s> Iterator for IncBpeTokenChainIter<'s> {
         if skip_len <= self.pos {
             self.pos -= skip_len;
         } else {
-            debug_assert!(skip_len == self.pos + 1);
+            debug_assert_eq!(skip_len, self.pos + 1);
             self.pos = self.seq.len();
         }
         Some(token)
@@ -193,6 +195,15 @@ mod tests {
         inc_bpe_case::<IN_BYTES, true>(vocab, rules, sequences);
     }
 
+    fn validate(dict: &Dictionary, seq: &[TokenId], inc_res: &[IncBpeToken]) {
+        for i in 0..seq.len() {
+            let expected = sentence_piece_impl::<false>(dict, &seq[0..i + 1]);
+            let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
+            let output = output.chain(std::iter::repeat(TokenId::MAX));
+            assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
+        }
+    }
+
     fn inc_bpe_case<const IN_BYTES: bool, const DISPLAY: bool>(
         vocab: &[&str],
         rules: &[(&str, &str)],
@@ -206,14 +217,6 @@ mod tests {
             NormalizedDict::new_in_utf8
         }(dict));
 
-        let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
-            for i in 0..seq.len() {
-                let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
-                let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
-                assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
-            }
-        };
-
         let tokenize = |s| {
             let single_tokens = if IN_BYTES {
                 tokenizer.split_bytes_to_tokens(s, 0usize)
@@ -221,7 +224,7 @@ mod tests {
                 tokenizer.split_utf8_to_tokens(s, 0usize)
             };
             let res = tokenizer.tokenize(single_tokens.iter().copied());
-            validate(&single_tokens, &res);
+            validate(&tokenizer, &single_tokens, &res);
             res
         };
 
@@ -309,7 +312,6 @@ mod tests {
                 .flat_map(|s| (1..s.len()).map(|p| s.split_at(p)))
                 .collect();
             assert!(all_rules.len() <= (1 << 10));
-            eprintln!("{vocab:?} {all_rules:?}");
             for j in 0..(1 << all_rules.len()) {
                 let rules: Vec<_> = all_rules
                     .iter()
@@ -336,7 +338,6 @@ mod tests {
                 }
             }
         }
-        eprintln!("{multiple_a_s:?}");
         let multiple_a_s = multiple_a_s.iter().map(|s| s.as_str()).collect::<Vec<_>>();
         inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
         let rules = [("a", "a"), ("aa", "aa"), ("aa", "a"), ("aaaa", "a")];
@@ -398,6 +399,62 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_inc_bpe_non_longest() {
+        let vocab = [
+            "<unk>", "a", "b", "c", "d", "e", "f", "g", "h", "i", "ab", "ba", "bc", "cd", "de",
+            "ef", "gh", "hi", "cde", "ghi", "fghi", "abcd", "fg", "efgh", "efghi", "bcd", "defgh",
+            "bcde", "bcdef", "bcdefgh",
+        ];
+        let rules = [
+            ("b", "a"),
+            ("a", "b"),
+            ("e", "f"),
+            ("f", "g"),
+            ("d", "e"),
+            ("c", "de"),
+            ("c", "d"),
+            ("b", "cde"),
+            ("b", "c"),
+            ("b", "cd"),
+            ("ab", "cd"),
+            ("g", "h"),
+            ("h", "i"),
+            ("gh", "i"),
+            ("ef", "gh"),
+            ("d", "efgh"),
+            ("bcd", "ef"),
+            ("bcd", "efgh"),
+            ("fg", "hi"),
+            ("ef", "ghi"),
+        ];
+        let mut sequences = vec!["babcdefghi"];
+        while sequences.last().unwrap().len() > 1 {
+            sequences.push(&sequences.last().unwrap()[1..])
+        }
+        {
+            let vocab = Vocab::new(vocab.iter().map(|&s| s.to_owned())).unwrap();
+            let dict =
+                Dictionary::new_from_token_pair(vocab.clone(), rules.iter().copied()).unwrap();
+            let normalized = NormalizedDict::new_in_bytes(dict);
+            let mut expected: Vec<_> = normalized
+                .useful_rules
+                .values()
+                .map(|i| i.as_usize())
+                .collect();
+            expected.sort();
+            assert_eq!(expected, (0..rules.len()).collect::<Vec<_>>());
+            assert!(
+                vocab
+                    .tokens
+                    .keys()
+                    .skip(1)
+                    .all(|id| normalized.is_useful(id))
+            );
+        }
+        inc_bpe_display_any_case(&vocab, &rules, &sequences);
+    }
+
     fn inc_bpe_demo_case(rules: &[(&str, &str)]) {
         let vocab = Vocab::new([
             b"<unk>" as &[_],
@@ -452,20 +509,13 @@ mod tests {
         for rules in [&[] as &[_], &[(0usize, 0usize)]] {
             let dict = Dictionary::new_from_id_pair(vocab.clone(), rules.iter().copied()).unwrap();
             let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict));
-            let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
-                for i in 0..seq.len() {
-                    let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
-                    let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
-                    assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
-                }
-            };
             for len in 1..9 {
                 for seq in 0..(1 << (len * 2)) {
                     let token_ids = (0..len)
                         .map(|i| avail_token_ids[(seq >> (i * 2)) & 3])
                         .collect::<Vec<_>>();
                     let res = tokenizer.tokenize(token_ids.iter().copied());
-                    validate(&token_ids, &res);
+                    validate(&tokenizer, &token_ids, &res);
                 }
             }
         }
