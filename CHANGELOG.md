@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.1.0...v0.2.0) - 2025-11-18
+
+### Added
+
+- [**breaking**] fetch token chain using iterator instead of vec for performance
+- [**breaking**] expose more context when checking if a token is single
+
+### Other
+
+- clean up code
+- optimize validation to reduce execution time
+- pre-allocate vector whenever possible
+- reorder functions
+
 ## [0.1.0](https://github.com/ModelTC/mtc-incremental-bpe/releases/tag/v0.1.0) - 2025-11-17
 
 ### Added
