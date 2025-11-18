@@ -26,29 +26,18 @@ pub struct IncBpeToken {
     pub skip_len: u32,
 }
 
-impl IncBpeToken {
-    pub fn fetch_chain(seq: &[Self], end_pos: usize) -> Vec<usize> {
-        if end_pos >= seq.len() {
-            return Vec::new();
-        }
-        let mut positions = vec![end_pos];
-        let mut current = end_pos;
-        while (seq[current].skip_len as usize) <= current {
-            current -= seq[current].skip_len as usize;
-            positions.push(current);
-        }
-        positions
-    }
+#[derive(Debug)]
+pub struct IncBpeTokenization<T> {
+    tokenizer: T,
+    tokens: Vec<IncBpeToken>,
+    forest_ids: Vec<ForestNodeId>,
+    ac_state: ACNodeId,
+}
 
-    pub fn token_ids(
-        seq: &[Self],
-        end_pos: usize,
-    ) -> impl IntoIterator<Item = TokenId> + Sync + Send {
-        Self::fetch_chain(seq, end_pos)
-            .into_iter()
-            .rev()
-            .map(move |i| seq[i].token_id)
-    }
+#[derive(Clone, Debug, Constructor, Into, From)]
+pub struct IncBpeTokenChainIter<'s> {
+    seq: &'s [IncBpeToken],
+    pos: usize,
 }
 
 impl IncBpeTokenizer {
@@ -67,8 +56,10 @@ impl IncBpeTokenizer {
     }
 
     pub fn tokenize<I: IntoIterator<Item = TokenId>>(&self, token_ids: I) -> Vec<IncBpeToken> {
+        let iter = token_ids.into_iter();
         let mut state = self.tokenization();
-        for token_id in token_ids {
+        state.reserve(iter.size_hint().0);
+        for token_id in iter {
             state.feed(token_id);
         }
         state.into_tokens()
@@ -79,14 +70,6 @@ impl IncBpeTokenizer {
     }
 }
 
-#[derive(Debug)]
-pub struct IncBpeTokenization<T> {
-    tokenizer: T,
-    tokens: Vec<IncBpeToken>,
-    forest_ids: Vec<ForestNodeId>,
-    ac_state: ACNodeId,
-}
-
 impl<T> IncBpeTokenization<T> {
     pub fn new(tokenizer: T) -> Self {
         Self {
@@ -95,22 +78,6 @@ impl<T> IncBpeTokenization<T> {
             forest_ids: Default::default(),
             ac_state: AC_NODE_ROOT,
         }
-    }
-
-    pub fn tokens(&self) -> &[IncBpeToken] {
-        &self.tokens
-    }
-
-    pub fn into_tokens(self) -> Vec<IncBpeToken> {
-        self.tokens
-    }
-
-    pub fn token_seq(&self, end_pos: usize) -> impl IntoIterator<Item = TokenId> + Sync + Send {
-        IncBpeToken::token_ids(&self.tokens, end_pos)
-    }
-
-    pub fn current_token_seq(&self) -> impl IntoIterator<Item = TokenId> + Sync + Send {
-        self.token_seq(self.tokens.len().saturating_sub(1))
     }
 }
 
@@ -151,11 +118,53 @@ impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
     }
 }
 
+impl<T> IncBpeTokenization<T> {
+    pub fn tokens(&self) -> &[IncBpeToken] {
+        &self.tokens
+    }
+
+    pub fn into_tokens(self) -> Vec<IncBpeToken> {
+        self.tokens
+    }
+
+    pub fn reserve(&mut self, additional: usize) {
+        self.tokens.reserve(additional);
+        self.forest_ids.reserve(additional);
+    }
+
+    pub fn token_chain(&self, end_pos: usize) -> IncBpeTokenChainIter<'_> {
+        IncBpeTokenChainIter::new(&self.tokens, end_pos)
+    }
+
+    pub fn current_token_seq(&self) -> IncBpeTokenChainIter<'_> {
+        self.token_chain(self.tokens.len().saturating_sub(1))
+    }
+}
+
+impl<'s> Iterator for IncBpeTokenChainIter<'s> {
+    type Item = IncBpeToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.seq.len() {
+            return None;
+        }
+        let token = self.seq[self.pos];
+        let skip_len = token.skip_len as usize;
+        if skip_len <= self.pos {
+            self.pos -= skip_len;
+        } else {
+            debug_assert!(skip_len == self.pos + 1);
+            self.pos = self.seq.len();
+        }
+        Some(token)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
         Dictionary, IncBpeToken, IncBpeTokenizer, NormalizedDict, TokenId, Vocab,
-        sp_impl::sentence_piece_impl,
+        inc_impl::IncBpeTokenChainIter, sp_impl::sentence_piece_impl,
     };
 
     fn inc_bpe_short_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
@@ -199,8 +208,11 @@ mod tests {
 
         let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
             for i in 0..seq.len() {
-                let expected = sentence_piece_impl::<false>(&tokenizer, seq[0..i + 1].to_vec());
-                let output: Vec<_> = IncBpeToken::token_ids(inc_res, i).into_iter().collect();
+                let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
+                let mut output: Vec<_> = IncBpeTokenChainIter::new(inc_res, i)
+                    .map(|i| i.token_id)
+                    .collect();
+                output.reverse();
                 assert!(output == expected);
             }
         };
@@ -445,12 +457,11 @@ mod tests {
             let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict));
             let validate = |seq: &[_], inc_res: &[IncBpeToken]| {
                 for i in 0..seq.len() {
-                    let expected = sentence_piece_impl::<false>(&tokenizer, seq[0..i + 1].to_vec());
-                    let output = {
-                        IncBpeToken::token_ids(inc_res, i)
-                            .into_iter()
-                            .collect::<Vec<_>>()
-                    };
+                    let expected = sentence_piece_impl::<false>(&tokenizer, &seq[0..i + 1]);
+                    let mut output: Vec<_> = IncBpeTokenChainIter::new(inc_res, i)
+                        .map(|i| i.token_id)
+                        .collect();
+                    output.reverse();
                     assert!(output == expected);
                 }
             };
