@@ -12,7 +12,7 @@ mod vocab;
 
 pub use crate::{
     dict::{DictBuildError, Dictionary, Rule, RuleId, UnknownToken},
-    inc_impl::{IncBpeToken, IncBpeTokenization, IncBpeTokenizer},
+    inc_impl::{IncBpeToken, IncBpeTokenChainIter, IncBpeTokenization, IncBpeTokenizer},
     normalize::NormalizedDict,
     vocab::{Token, TokenId, Vocab, VocabBuildError},
 };
