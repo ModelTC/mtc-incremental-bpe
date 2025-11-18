@@ -130,28 +130,24 @@ impl Dictionary {
         Ok(Self::from_rules(vocab, rules))
     }
 
-    pub fn num_of_rules(&self) -> RuleId {
-        self.rules.len()
-    }
-
-    pub fn get_rule_ids(&self, id: TokenId) -> Option<&[RuleId]> {
-        self.token_to_rule_ids.get(id).map(|v| v.as_slice())
+    pub fn rules(&self) -> &[Rule] {
+        self.rules.as_slice()
     }
 
     pub fn get_rule(&self, id: RuleId) -> Option<&Rule> {
         self.rules.get(id)
     }
 
+    pub fn num_of_rules(&self) -> RuleId {
+        self.rules.len()
+    }
+
     pub fn find_rule(&self, left: TokenId, right: TokenId) -> Option<RuleId> {
         self.pair_to_rule_id.get(&(left, right)).copied()
     }
 
-    pub fn rules(&self) -> &[Rule] {
-        self.rules.as_slice()
-    }
-
-    pub fn pair_to_rule_id_map(&self) -> &BTreeMap<(TokenId, TokenId), RuleId> {
-        &self.pair_to_rule_id
+    pub fn get_rule_ids(&self, id: TokenId) -> Option<&[RuleId]> {
+        self.token_to_rule_ids.get(id).map(|v| v.as_slice())
     }
 
     pub fn is_proper<F: Fn(&[u8]) -> bool>(&self, is_single: F) -> Result<(), RuleId> {
