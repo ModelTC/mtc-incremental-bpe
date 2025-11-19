@@ -38,8 +38,8 @@ pub struct UnknownToken(pub Token);
 pub enum DictBuildError {
     #[error("the {pos}-th rule contains an unknown token {token}")]
     UnknownToken { pos: RuleId, token: UnknownToken },
-    #[error("the {pos}-th rule contains an unknown token id {token_id}")]
-    UnknownTokenId { pos: RuleId, token_id: TokenId },
+    #[error("the {pos}-th rule contains an unknown token id {id}")]
+    UnknownTokenId { pos: RuleId, id: TokenId },
 }
 
 impl Dictionary {
@@ -70,7 +70,7 @@ impl Dictionary {
         let get_token = |pos, id| {
             vocab
                 .get_token(id)
-                .ok_or(DictBuildError::UnknownTokenId { pos, token_id: id })
+                .ok_or(DictBuildError::UnknownTokenId { pos, id })
         };
         for (pos, (left, right)) in rule_iter.map(|(i, j)| (i.into(), j.into())).enumerate() {
             let pos = RuleId::from(pos);
@@ -80,7 +80,7 @@ impl Dictionary {
                 buf.freeze()
             };
             let merged = vocab
-                .get_token_id(&token)
+                .find_token_id(&token)
                 .ok_or(DictBuildError::UnknownToken {
                     pos,
                     token: UnknownToken(token),
@@ -102,7 +102,7 @@ impl Dictionary {
         let mut rules = TypedVec::with_capacity(rule_iter.size_hint().0);
         let get_id = |pos, token: &[u8]| {
             vocab
-                .get_token_id(token)
+                .find_token_id(token)
                 .ok_or(DictBuildError::UnknownToken {
                     pos,
                     token: UnknownToken(token.to_owned().into()),

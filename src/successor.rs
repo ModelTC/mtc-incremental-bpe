@@ -224,7 +224,7 @@ mod tests {
         let validate = |rules: &[(&str, &str)]| {
             let dict =
                 Dictionary::new_from_token_pair(vocab.clone(), rules.iter().copied()).unwrap();
-            let normalized = NormalizedDict::new_in_bytes(dict.clone());
+            let normalized = NormalizedDict::new_in_bytes(dict.clone()).unwrap();
             let forest = SucForest::new(&normalized);
             for (node_id, node) in forest.enumerate() {
                 if node_id != FOREST_VIRTUAL_ROOT && node.token_id.inner() > 0 {
@@ -237,7 +237,7 @@ mod tests {
                 };
                 println!("{s:12} {node_id:2}: {node:?}");
             }
-            let normalized = NormalizedDict::new_in_utf8(dict.clone());
+            let normalized = NormalizedDict::new_in_utf8(dict.clone()).unwrap();
             let forest_b = SucForest::new(&normalized);
 
             assert_eq!(forest.token_to_node_id, forest_b.token_to_node_id);
@@ -281,7 +281,7 @@ mod tests {
             [("b", "c"), ("e", "f"), ("abc", "def")],
         )
         .unwrap();
-        let normalized = NormalizedDict::new_in_bytes(dict.clone());
-        SucForest::new(&normalized);
+        let dict = NormalizedDict::new_in_bytes(dict).unwrap();
+        SucForest::new(&dict);
     }
 }

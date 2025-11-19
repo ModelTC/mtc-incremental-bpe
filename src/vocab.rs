@@ -50,7 +50,7 @@ impl Vocab {
         })
     }
 
-    pub fn get_token_id<T: AsRef<[u8]>>(&self, token: T) -> Option<TokenId> {
+    pub fn find_token_id<T: AsRef<[u8]>>(&self, token: T) -> Option<TokenId> {
         self.token_to_id.get(token.as_ref()).copied()
     }
 
@@ -78,7 +78,7 @@ impl Vocab {
         let unknown_token_id = unknown_token_id.into();
         seq.as_ref()
             .windows(1)
-            .map(|i| self.get_token_id(i).unwrap_or(unknown_token_id))
+            .map(|i| self.find_token_id(i).unwrap_or(unknown_token_id))
             .collect()
     }
 
@@ -96,7 +96,7 @@ impl Vocab {
                 continue;
             }
             res.push(
-                self.get_token_id(&seq.as_bytes()[left..right])
+                self.find_token_id(&seq.as_bytes()[left..right])
                     .unwrap_or(unknown_token_id),
             );
             left = right;
@@ -127,13 +127,13 @@ mod tests {
 
         assert_eq!(vocab.num_of_tokens().0, 7);
 
-        assert_eq!(vocab.get_token_id(b"a"), Some(TokenId::new(0)));
-        assert_eq!(vocab.get_token_id(b"b"), Some(TokenId::new(1)));
-        assert_eq!(vocab.get_token_id(b"cd"), Some(TokenId::new(4)));
-        assert_eq!(vocab.get_token_id(b"abcd"), Some(TokenId::new(6)));
-        assert_eq!(vocab.get_token_id(b""), None);
-        assert_eq!(vocab.get_token_id(b"e"), None);
-        assert_eq!(vocab.get_token_id(b"random"), None);
+        assert_eq!(vocab.find_token_id(b"a"), Some(TokenId::new(0)));
+        assert_eq!(vocab.find_token_id(b"b"), Some(TokenId::new(1)));
+        assert_eq!(vocab.find_token_id(b"cd"), Some(TokenId::new(4)));
+        assert_eq!(vocab.find_token_id(b"abcd"), Some(TokenId::new(6)));
+        assert_eq!(vocab.find_token_id(b""), None);
+        assert_eq!(vocab.find_token_id(b"e"), None);
+        assert_eq!(vocab.find_token_id(b"random"), None);
 
         let check_token = |id: u32, e: &str| {
             let token = vocab.get_token(id).map(|b| b.as_ref());

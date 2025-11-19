@@ -42,10 +42,11 @@ pub struct IncBpeTokenization<T> {
 
 impl IncBpeToken {
     pub fn new<I: Into<TokenId>>(token_id: I, skip_len: u32) -> Self {
-        Self {
-            token_id: token_id.into(),
-            skip_len,
-        }
+        Self::new_const(token_id.into(), skip_len)
+    }
+
+    pub fn new_const(token_id: TokenId, skip_len: u32) -> Self {
+        Self { token_id, skip_len }
     }
 }
 
@@ -64,14 +65,17 @@ impl IncBpeTokenizer {
         }
     }
 
-    pub fn tokenize<I: IntoIterator<Item = TokenId>>(&self, token_ids: I) -> Vec<IncBpeToken> {
+    pub fn tokenize<I: IntoIterator<Item = TokenId>>(
+        &self,
+        token_ids: I,
+    ) -> IncBpeTokenization<&Self> {
         let iter = token_ids.into_iter();
         let mut state = self.tokenization();
         state.reserve(iter.size_hint().0);
         for token_id in iter {
             state.feed(token_id);
         }
-        state.into_tokens()
+        state
     }
 
     pub fn tokenization(&self) -> IncBpeTokenization<&Self> {
@@ -223,11 +227,14 @@ mod tests {
     ) {
         let vocab = Vocab::new(vocab.iter().map(|&s| s.to_owned())).unwrap();
         let dict = Dictionary::new_from_token_pair(vocab, rules.iter().copied()).unwrap();
-        let tokenizer = IncBpeTokenizer::new(if IN_BYTES {
-            NormalizedDict::new_in_bytes
-        } else {
-            NormalizedDict::new_in_utf8
-        }(dict));
+        let tokenizer = IncBpeTokenizer::new(
+            if IN_BYTES {
+                NormalizedDict::new_in_bytes
+            } else {
+                NormalizedDict::new_in_utf8
+            }(dict)
+            .unwrap(),
+        );
 
         let tokenize = |s| {
             let single_tokens = if IN_BYTES {
@@ -235,7 +242,9 @@ mod tests {
             } else {
                 tokenizer.split_utf8_to_tokens(s, 0usize)
             };
-            let res = tokenizer.tokenize(single_tokens.iter().copied());
+            let res = tokenizer
+                .tokenize(single_tokens.iter().copied())
+                .into_tokens();
             validate(&tokenizer, &single_tokens, &res);
             res
         };
@@ -448,7 +457,7 @@ mod tests {
             let vocab = Vocab::new(vocab.iter().map(|&s| s.to_owned())).unwrap();
             let dict =
                 Dictionary::new_from_token_pair(vocab.clone(), rules.iter().copied()).unwrap();
-            let normalized = NormalizedDict::new_in_bytes(dict);
+            let normalized = NormalizedDict::new_in_bytes(dict).unwrap();
             let mut expected: Vec<_> = normalized
                 .useful_rules
                 .values()
@@ -494,8 +503,12 @@ mod tests {
         .unwrap();
 
         let dict = Dictionary::new_from_token_pair(vocab, rules.iter().copied()).unwrap();
-        let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict));
-        let tokenize = |s| tokenizer.tokenize(tokenizer.split_bytes_to_tokens(s, 0usize));
+        let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict).unwrap());
+        let tokenize = |s| {
+            tokenizer
+                .tokenize(tokenizer.split_bytes_to_tokens(s, 0usize))
+                .into_tokens()
+        };
 
         let display_res = |res: &[IncBpeToken]| {
             let msg = String::from_iter(res.iter().map(|t| {
@@ -520,13 +533,13 @@ mod tests {
         let avail_token_ids = [0, 2, 3, TokenId::MAX.inner()].map(TokenId::new);
         for rules in [&[] as &[_], &[(0usize, 0usize)]] {
             let dict = Dictionary::new_from_id_pair(vocab.clone(), rules.iter().copied()).unwrap();
-            let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict));
+            let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict).unwrap());
             for len in 1..9 {
                 for seq in 0..(1 << (len * 2)) {
                     let token_ids = (0..len)
                         .map(|i| avail_token_ids[(seq >> (i * 2)) & 3])
                         .collect::<Vec<_>>();
-                    let res = tokenizer.tokenize(token_ids.iter().copied());
+                    let res = tokenizer.tokenize(token_ids.iter().copied()).into_tokens();
                     validate(&tokenizer, &token_ids, &res);
                 }
             }
