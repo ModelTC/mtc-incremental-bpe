@@ -1,8 +1,24 @@
 use std::collections::BTreeMap;
 
 use derive_more::Deref;
+use thiserror::Error;
 
 use crate::{Dictionary, RuleId, TokenId, typed_vec::TypedVec};
+
+#[derive(Clone, Debug, Error)]
+pub enum NormalizedDictBuildError {
+    #[error("singleton token {suf} is a suffix of singleton token {id}, which is not allowed")]
+    SingletonSuffix { id: TokenId, suf: TokenId },
+}
+
+#[derive(Clone, Debug, Deref)]
+pub struct NormalizedDict {
+    #[deref]
+    dict: Dictionary,
+    pub(crate) priorities: TypedVec<TokenId, RuleId>,
+    #[cfg(test)]
+    pub(crate) useful_rules: BTreeMap<(TokenId, TokenId), RuleId>,
+}
 
 pub(crate) const SINGLETON_PRIORITY: RuleId = {
     let mut priority = RuleId::MAX;
@@ -15,30 +31,36 @@ fn singleton_token_id(rule_id: RuleId) -> TokenId {
     TokenId::new((rule_id - SINGLETON_PRIORITY).inner())
 }
 
-#[derive(Clone, Debug, Deref)]
-pub struct NormalizedDict {
-    #[deref]
-    dict: Dictionary,
-    pub(crate) priorities: TypedVec<TokenId, RuleId>,
-    #[cfg(test)]
-    pub(crate) useful_rules: BTreeMap<(TokenId, TokenId), RuleId>,
-}
-
 impl NormalizedDict {
     pub fn new<F: FnMut(&Dictionary, TokenId, &[u8]) -> bool>(
         dict: Dictionary,
         mut is_single: F,
-    ) -> Self {
+    ) -> Result<Self, NormalizedDictBuildError> {
         let len = dict.num_of_tokens().as_usize();
         let mut priorities = TypedVec::<TokenId, _>::from(vec![RuleId::MAX; len]);
         let mut useful_rules: BTreeMap<(TokenId, TokenId), RuleId> = Default::default();
 
-        for (id, priority) in priorities.enumerate_mut() {
-            if is_single(&dict, id, &dict[id]) {
-                debug_assert!(id.as_usize() < SINGLETON_PRIORITY.as_usize());
+        for (token_id, priority) in priorities.enumerate_mut() {
+            if is_single(&dict, token_id, &dict[token_id]) {
+                debug_assert!(token_id.as_usize() < SINGLETON_PRIORITY.as_usize());
                 let mut p = SINGLETON_PRIORITY;
-                *p.inner_mut() += id.inner();
+                *p.inner_mut() += token_id.inner();
                 *priority = p;
+            }
+        }
+
+        for (token_id, rule_id) in priorities.enumerate_copied() {
+            if rule_id == RuleId::MAX {
+                continue;
+            }
+            let token = &dict[token_id];
+            for start in 1..token.len() {
+                if let Some(suf) = dict.find_token_id(&token[start..]) {
+                    if priorities[suf] == RuleId::MAX {
+                        continue;
+                    }
+                    return Err(NormalizedDictBuildError::SingletonSuffix { id: token_id, suf });
+                }
             }
         }
 
@@ -96,19 +118,21 @@ impl NormalizedDict {
             debug_assert!(res.is_none());
         }
 
-        Self {
+        Ok(Self {
             dict,
             priorities,
             #[cfg(test)]
             useful_rules,
-        }
+        })
     }
 
-    pub fn new_in_bytes(dict: Dictionary) -> Self {
+    #[inline]
+    pub fn new_in_bytes(dict: Dictionary) -> Result<Self, NormalizedDictBuildError> {
         Self::new(dict, |_, _, b| b.len() == 1)
     }
 
-    pub fn new_in_utf8(dict: Dictionary) -> Self {
+    #[inline]
+    pub fn new_in_utf8(dict: Dictionary) -> Result<Self, NormalizedDictBuildError> {
         Self::new(dict, |_, _, b| {
             if b.len() > 4 {
                 return false;
@@ -140,7 +164,7 @@ mod tests {
     }
 
     fn build_in_bytes(dict: &Dictionary) -> NormalizedDict {
-        let dict = NormalizedDict::new_in_bytes(dict.clone());
+        let dict = NormalizedDict::new_in_bytes(dict.clone()).unwrap();
         for rule in &dict.rules {
             let token_id = rule.merged;
             assert!(!dict.is_single(token_id));
@@ -152,7 +176,7 @@ mod tests {
     }
 
     fn build_in_utf8(dict: &Dictionary) -> NormalizedDict {
-        let dict = NormalizedDict::new_in_utf8(dict.clone());
+        let dict = NormalizedDict::new_in_utf8(dict.clone()).unwrap();
         for rule in &dict.rules {
             let token_id = rule.merged;
             let seq = match std::str::from_utf8(&dict[token_id]) {
@@ -369,5 +393,16 @@ mod tests {
             ],
         );
         build_and_test_rules(&dict, 0..13);
+    }
+
+    #[test]
+    fn test_normalized_dict_invalid() {
+        let dict = Dictionary::new_from_id_pair(
+            Vocab::new([b"a" as &[_], b"aa"]).unwrap(),
+            [] as [(usize, usize); _],
+        )
+        .unwrap();
+        let res = NormalizedDict::new(dict, |_, _, _| true);
+        assert!(res.is_err());
     }
 }

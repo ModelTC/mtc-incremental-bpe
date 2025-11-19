@@ -213,9 +213,9 @@ mod tests {
         .unwrap();
 
         let dict = Dictionary::new_from_token_pair(vocab, rules.iter().copied()).unwrap();
+        let dict = NormalizedDict::new_in_bytes(dict.clone()).unwrap();
         let automaton = ACAutomaton::new(&dict);
-        let normalized = NormalizedDict::new_in_bytes(dict.clone());
-        let forest = SucForest::new(&normalized);
+        let forest = SucForest::new(&dict);
 
         for (node_id, node) in forest.enumerate() {
             let s = if node_id.inner() == 0 {
