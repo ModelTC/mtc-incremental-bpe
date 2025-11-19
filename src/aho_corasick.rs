@@ -77,27 +77,27 @@ impl ACTrie {
         self.nodes.len()
     }
 
-    fn get_or_add(&mut self, id: ACNodeId, byte: u8) -> ACNodeId {
-        let child = self.nodes[id][byte];
+    fn get_or_add(&mut self, node_id: ACNodeId, byte: u8) -> ACNodeId {
+        let child = self.nodes[node_id][byte];
         if child == AC_NODE_ROOT {
             let child_id = self.nodes.push(Default::default());
-            self.nodes[id].add_child(byte, child_id);
+            self.nodes[node_id].add_child(byte, child_id);
             child_id
         } else {
             child
         }
     }
 
-    fn get(&self, id: ACNodeId, byte: u8) -> ACNodeId {
-        self.nodes[id][byte]
+    fn get(&self, node_id: ACNodeId, byte: u8) -> ACNodeId {
+        self.nodes[node_id][byte]
     }
 
-    fn children_nodes(&self, id: ACNodeId) -> &[ACNodeId] {
-        &self.nodes[id].children
+    fn children_nodes(&self, node_id: ACNodeId) -> &[ACNodeId] {
+        &self.nodes[node_id].children
     }
 
-    pub fn children(&self, id: ACNodeId) -> impl Iterator<Item = (ACNodeId, u8)> {
-        let node = &self.nodes[id];
+    pub fn children(&self, node_id: ACNodeId) -> impl Iterator<Item = (ACNodeId, u8)> {
+        let node = &self.nodes[node_id];
         debug_assert_eq!(node.children.len(), node.keys.len());
         node.children.iter().copied().zip(node.keys.iter().copied())
     }

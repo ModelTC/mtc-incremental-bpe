@@ -132,8 +132,8 @@ impl Dictionary {
         self.rules.as_slice()
     }
 
-    pub fn get_rule(&self, id: RuleId) -> Option<&Rule> {
-        self.rules.get(id)
+    pub fn get_rule(&self, rule_id: RuleId) -> Option<&Rule> {
+        self.rules.get(rule_id)
     }
 
     pub fn num_of_rules(&self) -> RuleId {
@@ -144,8 +144,8 @@ impl Dictionary {
         self.pair_to_rule_id.get(&(left, right)).copied()
     }
 
-    pub fn get_rule_ids(&self, id: TokenId) -> Option<&[RuleId]> {
-        self.token_to_rule_ids.get(id).map(|v| v.as_slice())
+    pub fn get_rule_ids(&self, token_id: TokenId) -> Option<&[RuleId]> {
+        self.token_to_rule_ids.get(token_id).map(|v| v.as_slice())
     }
 
     pub fn is_proper<F: FnMut(TokenId, &[u8]) -> bool>(

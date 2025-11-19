@@ -135,7 +135,7 @@ impl SufSucCentroidTree {
 
         while let Some((root_id, parent_centroid)) = roots.pop() {
             let half_size = subtree[root_id].size / 2;
-            let next_large_subtree = |id: SubTreeNodeId| -> Option<(usize, SubTreeNodeId)> {
+            let next_large_subtree = |id| -> Option<(usize, SubTreeNodeId)> {
                 subtree[id]
                     .children
                     .iter()
@@ -202,7 +202,7 @@ impl SufSucCentroidTree {
 
         for id in centroids.keys() {
             let mut order = Vec::from_iter(0..centroids[id].children.len());
-            order.sort_unstable_by_key(|&i| centroids[id].intervals[i].0);
+            order.sort_by_key(|&i| centroids[id].intervals[i].0);
             let children = order
                 .iter()
                 .copied()
