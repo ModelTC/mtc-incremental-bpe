@@ -54,8 +54,8 @@ impl Vocab {
         self.token_to_id.get(token.as_ref()).copied()
     }
 
-    pub fn get_token<T: Into<TokenId>>(&self, id: T) -> Option<&Token> {
-        self.tokens.get(id.into())
+    pub fn get_token<T: Into<TokenId>>(&self, token_id: T) -> Option<&Token> {
+        self.tokens.get(token_id.into())
     }
 
     pub fn num_of_tokens(&self) -> TokenId {
@@ -136,7 +136,8 @@ mod tests {
         assert_eq!(vocab.get_token_id(b"random"), None);
 
         let check_token = |id: u32, e: &str| {
-            assert_eq!(vocab.get_token(id).map(|b| b.as_ref()), Some(e.as_bytes()));
+            let token = vocab.get_token(id).map(|b| b.as_ref());
+            assert_eq!(token, Some(e.as_bytes()));
         };
         check_token(0, "a");
         check_token(3, "d");

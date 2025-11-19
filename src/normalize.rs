@@ -117,12 +117,14 @@ impl NormalizedDict {
         })
     }
 
-    pub fn is_single(&self, id: TokenId) -> bool {
-        self.priorities[id] != RuleId::MAX && self.priorities[id] >= SINGLETON_PRIORITY
+    #[inline]
+    pub fn is_single(&self, token_id: TokenId) -> bool {
+        self.is_useful(token_id) && self.priorities[token_id] >= SINGLETON_PRIORITY
     }
 
-    pub fn is_useful(&self, id: TokenId) -> bool {
-        self.priorities[id] != RuleId::MAX
+    #[inline]
+    pub fn is_useful(&self, token_id: TokenId) -> bool {
+        self.priorities[token_id] != RuleId::MAX
     }
 }
 
