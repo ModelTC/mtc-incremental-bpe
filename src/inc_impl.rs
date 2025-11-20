@@ -83,23 +83,40 @@ impl IncBpeTokenizer {
     }
 }
 
+impl<S> IncBpeTokenChainIter<S> {
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+
+    pub fn seq(&self) -> &S {
+        &self.seq
+    }
+}
+
+impl<S: Borrow<[IncBpeToken]>> IncBpeTokenChainIter<S> {
+    pub fn token_ids(self) -> impl Iterator<Item = TokenId> {
+        self.map(|(_, t)| t.token_id)
+    }
+}
+
 impl<S: Borrow<[IncBpeToken]>> Iterator for IncBpeTokenChainIter<S> {
-    type Item = IncBpeToken;
+    type Item = (usize, IncBpeToken);
 
     fn next(&mut self) -> Option<Self::Item> {
         let seq: &[IncBpeToken] = self.seq.borrow();
-        if self.pos >= seq.len() {
+        let pos = self.pos;
+        if pos >= seq.len() {
             return None;
         }
-        let token = seq[self.pos];
+        let token = seq[pos];
         let skip_len = token.skip_len as usize;
-        if skip_len <= self.pos {
+        if skip_len <= pos {
             self.pos -= skip_len;
         } else {
-            debug_assert_eq!(skip_len, self.pos + 1);
+            debug_assert_eq!(skip_len, pos + 1);
             self.pos = seq.len();
         }
-        Some(token)
+        Some((pos, token))
     }
 }
 
@@ -214,7 +231,7 @@ mod tests {
     fn validate(dict: &Dictionary, seq: &[TokenId], inc_res: &[IncBpeToken]) {
         for i in 0..seq.len() {
             let expected = sentence_piece_impl::<false>(dict, &seq[0..i + 1]);
-            let output = IncBpeTokenChainIter::new(inc_res, i).map(|i| i.token_id);
+            let output = IncBpeTokenChainIter::new(inc_res, i).token_ids();
             let output = output.chain(std::iter::repeat(TokenId::MAX));
             assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
         }
@@ -587,7 +604,7 @@ mod tests {
         for (end_pos, seq) in seqs.into_iter().enumerate() {
             let expected: Vec<_> = seq.into_iter().map(|i| i.into()).collect();
             let iter = IncBpeTokenChainIter::new(chain.clone(), end_pos);
-            let output: Vec<_> = iter.map(|i| i.token_id).collect();
+            let output: Vec<_> = iter.map(|(_, i)| i.token_id).collect();
             assert_eq!(output, expected);
         }
     }
