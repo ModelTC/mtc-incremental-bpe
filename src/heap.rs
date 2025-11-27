@@ -159,7 +159,7 @@ where
                 .chain(iter.into_iter().map(|(u, v)| (v, u))),
         );
 
-        let mut cur = nodes.len() - ROOT;
+        let mut cur = nodes.len().prev();
         while let parent = cur.parent()
             && !parent.is_nil()
         {
