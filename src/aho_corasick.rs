@@ -172,9 +172,10 @@ impl ACAutomaton {
             if suf == id {
                 continue;
             }
-            for b in 0..ALPHABET_SIZE {
-                if trie.nodes[id][b as u8] == AC_NODE_ROOT {
-                    trie.nodes[id][b as u8] = trie.nodes[suf][b as u8];
+            let (cur_node, suf_node) = trie.nodes.two_diff_mut(id, suf);
+            for (cur, suf) in cur_node.map.iter_mut().zip(&suf_node.map) {
+                if *cur == AC_NODE_ROOT {
+                    *cur = *suf;
                 }
             }
         }

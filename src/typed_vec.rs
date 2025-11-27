@@ -60,6 +60,18 @@ impl<I: TypedVecIndex, T> TypedVec<I, T> {
         I::from_usize(self.inner.len())
     }
 
+    #[inline(always)]
+    pub fn two_diff_mut(&mut self, u: I, v: I) -> (&mut T, &mut T) {
+        debug_assert!(u != v);
+        if u > v {
+            let (left, right) = self.two_diff_mut(v, u);
+            (right, left)
+        } else {
+            let (left, right) = self.inner.split_at_mut(v.into_usize());
+            (&mut left[u.into_usize()], &mut right[0])
+        }
+    }
+
     pub fn enumerate(&self) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator {
         self.inner
             .iter()
