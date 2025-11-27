@@ -183,6 +183,7 @@ impl Dictionary {
 impl Index<RuleId> for Dictionary {
     type Output = Rule;
 
+    #[inline(always)]
     fn index(&self, index: RuleId) -> &Self::Output {
         self.rules.index(index)
     }
@@ -191,6 +192,7 @@ impl Index<RuleId> for Dictionary {
 impl Index<TokenId> for Dictionary {
     type Output = Token;
 
+    #[inline(always)]
     fn index(&self, index: TokenId) -> &Self::Output {
         self.vocab.index(index)
     }

@@ -48,12 +48,14 @@ impl ACNode {
 impl Index<u8> for ACNode {
     type Output = ACNodeId;
 
+    #[inline(always)]
     fn index(&self, index: u8) -> &Self::Output {
         &self.map[index as usize]
     }
 }
 
 impl IndexMut<u8> for ACNode {
+    #[inline(always)]
     fn index_mut(&mut self, index: u8) -> &mut Self::Output {
         &mut self.map[index as usize]
     }
@@ -73,6 +75,7 @@ impl Default for ACTrie {
 }
 
 impl ACTrie {
+    #[inline(always)]
     pub fn num_of_nodes(&self) -> ACNodeId {
         self.nodes.len()
     }
@@ -88,10 +91,12 @@ impl ACTrie {
         }
     }
 
+    #[inline(always)]
     fn get(&self, node_id: ACNodeId, byte: u8) -> ACNodeId {
         self.nodes[node_id][byte]
     }
 
+    #[inline(always)]
     fn children_nodes(&self, node_id: ACNodeId) -> &[ACNodeId] {
         &self.nodes[node_id].children
     }
@@ -181,6 +186,7 @@ impl ACAutomaton {
         }
     }
 
+    #[inline(always)]
     pub fn feed<B: AsRef<[u8]>>(&self, mut node: ACNodeId, bytes: B) -> ACNodeId {
         for &byte in bytes.as_ref() {
             node = self.get(node, byte);

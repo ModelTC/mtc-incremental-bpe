@@ -220,7 +220,7 @@ impl SufSucCentroidTree {
         Self { nodes: centroids }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn search<F: Fn(usize) -> ForestNodeId>(&self, skip_to: F) -> ForestNodeId {
         let len = self.len();
         let to_parent = |node: CentroidId| {

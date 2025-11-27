@@ -22,12 +22,12 @@ pub(crate) struct SufSucNode {
 }
 
 impl SufSucNode {
-    #[inline]
+    #[inline(always)]
     pub fn verify<F: FnOnce(usize) -> ForestNodeId>(&self, f: F) -> bool {
         self.verify_skipped(f(self.suc_skip_len as usize))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn verify_skipped(&self, w: ForestNodeId) -> bool {
         let (u, v) = self.valid_range;
         u <= w && w < v
