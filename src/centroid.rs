@@ -208,13 +208,13 @@ impl SufSucCentroidTree {
                 .copied()
                 .map(|i| centroids[id].children[i])
                 .collect();
-            centroids[id].children.clone_from(&children);
+            centroids[id].children = children;
             let intervals = order
                 .iter()
                 .copied()
                 .map(|i| centroids[id].intervals[i])
                 .collect();
-            centroids[id].intervals.clone_from(&intervals);
+            centroids[id].intervals = intervals;
         }
 
         Self { nodes: centroids }
