@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.4.0...v0.4.1) - 2025-11-27
+
+### Other
+
+- optimize constructors in debug mode ([#17](https://github.com/ModelTC/mtc-incremental-bpe/pull/17))
+
 ## [0.4.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.3.1...v0.4.0) - 2025-11-20
 
 ### Added
