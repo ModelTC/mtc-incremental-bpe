@@ -28,6 +28,7 @@ impl<I, T: Clone> Clone for TypedVec<I, T> {
 }
 
 impl<I, T: PartialEq> PartialEq for TypedVec<I, T> {
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
@@ -36,23 +37,39 @@ impl<I, T: PartialEq> PartialEq for TypedVec<I, T> {
 impl<I, T: Eq> Eq for TypedVec<I, T> {}
 
 impl<I: TypedVecIndex, T> TypedVec<I, T> {
+    #[inline(always)]
     pub fn push(&mut self, val: T) -> I {
         let len = self.len();
         self.inner.push(val);
         len
     }
 
+    #[inline(always)]
     pub fn get(&self, id: I) -> Option<&T> {
         let id = id.into_usize();
         self.inner.get(id)
     }
 
+    #[inline(always)]
     pub fn swap(&mut self, u: I, v: I) {
         self.inner.swap(u.into_usize(), v.into_usize());
     }
 
+    #[inline(always)]
     pub fn len(&self) -> I {
         I::from_usize(self.inner.len())
+    }
+
+    #[inline(always)]
+    pub fn two_diff_mut(&mut self, u: I, v: I) -> (&mut T, &mut T) {
+        debug_assert!(u != v);
+        if u > v {
+            let (left, right) = self.two_diff_mut(v, u);
+            (right, left)
+        } else {
+            let (left, right) = self.inner.split_at_mut(v.into_usize());
+            (&mut left[u.into_usize()], &mut right[0])
+        }
     }
 
     pub fn enumerate(&self) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator {
@@ -84,28 +101,34 @@ impl<I, T> TypedVec<I, T> {
         }
     }
 
+    #[inline(always)]
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop()
     }
 
+    #[inline(always)]
     pub fn is_empty(&mut self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline(always)]
     pub fn as_slice(&self) -> &[T] {
         self.inner.as_ref()
     }
 
+    #[inline(always)]
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator {
         self.inner.iter()
     }
 
+    #[inline(always)]
     pub fn last(&self) -> Option<&T> {
         self.inner.last()
     }
 }
 
 impl<I, T> AsRef<[T]> for TypedVec<I, T> {
+    #[inline(always)]
     fn as_ref(&self) -> &[T] {
         &self.inner
     }
@@ -134,12 +157,14 @@ impl<I: TypedVecIndex, T: Copy> TypedVec<I, T> {
 impl<I: TypedVecIndex, T> Index<I> for TypedVec<I, T> {
     type Output = <Vec<T> as Index<usize>>::Output;
 
+    #[inline(always)]
     fn index(&self, index: I) -> &Self::Output {
         self.inner.index(index.into_usize())
     }
 }
 
 impl<I: TypedVecIndex, T> IndexMut<I> for TypedVec<I, T> {
+    #[inline(always)]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.inner.index_mut(index.into_usize())
     }
@@ -160,7 +185,7 @@ impl<I, T> FromIterator<T> for TypedVec<I, T> {
     }
 }
 
-pub(crate) trait TypedVecIndex: 'static {
+pub(crate) trait TypedVecIndex: 'static + PartialEq + PartialOrd {
     fn into_usize(self) -> usize;
     fn from_usize(val: usize) -> Self;
 }
@@ -169,6 +194,7 @@ macro_rules! from_usize {
     ($name:ident, usize) => {};
     ($name:ident, $inner:tt) => {
         impl From<usize> for $name {
+            #[inline(always)]
             fn from(val: usize) -> Self {
                 Self(val as $inner)
             }
@@ -204,40 +230,49 @@ macro_rules! typed_vec_index {
             pub const ZERO: Self = Self($inner::MIN);
             pub const MAX: Self = Self($inner::MAX);
 
+            #[inline(always)]
             pub const fn new(inner: $inner) -> Self {
                 Self(inner)
             }
 
+            #[inline(always)]
             pub const fn next(self) -> Self {
                 Self(self.0 + 1)
             }
 
+            #[inline(always)]
             pub const fn prev(self) -> Self {
                 Self(self.0.saturating_sub(1))
             }
 
+            #[inline(always)]
             pub const fn inner(self) -> $inner {
                 self.0
             }
 
+            #[inline(always)]
             pub const fn inner_ref(&self) -> &$inner {
                 &self.0
             }
 
+            #[inline(always)]
             pub const fn inner_mut(&mut self) -> &mut $inner {
                 &mut self.0
             }
 
+            #[inline(always)]
             pub const fn as_usize(self) -> usize {
                 self.inner() as usize
             }
         }
 
         impl $crate::typed_vec::TypedVecIndex for $name {
+            #[inline(always)]
             fn into_usize(self) -> usize {
                 self.as_usize()
             }
 
+            #[inline(always)]
             fn from_usize(val: usize) -> Self {
                 Self(val.min(<$inner>::MAX as usize) as $inner)
             }
@@ -246,6 +281,7 @@ macro_rules! typed_vec_index {
         $crate::typed_vec::from_usize!($name, $inner);
 
         impl ::core::borrow::Borrow<$inner> for $name {
+            #[inline(always)]
             fn borrow(&self) -> &$inner {
                 &self.0
             }

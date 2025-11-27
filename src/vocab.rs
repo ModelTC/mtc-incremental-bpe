@@ -109,6 +109,7 @@ impl Vocab {
 impl Index<TokenId> for Vocab {
     type Output = Token;
 
+    #[inline(always)]
     fn index(&self, index: TokenId) -> &Self::Output {
         self.tokens.index(index)
     }

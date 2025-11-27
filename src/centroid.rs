@@ -208,19 +208,19 @@ impl SufSucCentroidTree {
                 .copied()
                 .map(|i| centroids[id].children[i])
                 .collect();
-            centroids[id].children.clone_from(&children);
+            centroids[id].children = children;
             let intervals = order
                 .iter()
                 .copied()
                 .map(|i| centroids[id].intervals[i])
                 .collect();
-            centroids[id].intervals.clone_from(&intervals);
+            centroids[id].intervals = intervals;
         }
 
         Self { nodes: centroids }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn search<F: Fn(usize) -> ForestNodeId>(&self, skip_to: F) -> ForestNodeId {
         let len = self.len();
         let to_parent = |node: CentroidId| {
