@@ -18,7 +18,6 @@ pub(crate) struct SufSucNode {
     pub forest_id: ForestNodeId,
     pub skip_len: SkipLen,
     pub suc_skip_len: SkipLen,
-    pub depth: u32,
     pub valid_range: (ForestNodeId, ForestNodeId),
 }
 
@@ -131,7 +130,6 @@ impl SufSucNodeSet {
             .map(|(i, node)| SufSucNode {
                 forest_id: i,
                 skip_len: node.skip_len,
-                depth: node.depth,
                 suc_skip_len: forest[node.parent].skip_len,
                 valid_range: calc_valid_pre_node_id_range(i),
             })
@@ -143,8 +141,6 @@ impl SufSucNodeSet {
                 let parent = forest[i].parent;
                 if parent == i {
                     debug_assert_eq!(i, FOREST_VIRTUAL_ROOT);
-                } else {
-                    debug_assert_eq!(node.depth, forest[parent].depth + 1);
                 }
                 debug_assert_eq!(node.forest_id, i);
                 debug_assert_eq!(node.skip_len, forest[i].skip_len);

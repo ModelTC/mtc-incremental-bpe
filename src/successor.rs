@@ -20,7 +20,6 @@ pub(crate) struct SucNode {
     pub priority: RuleId,
     pub skip_len: SkipLen,
     pub pre_id: ForestNodeId,
-    pub depth: u32,
     pub parent: ForestNodeId,
     pub subtree_last_node: ForestNodeId,
     pub children: SmallVec<[ForestNodeId; NUM_INLINE_FOREST_NODES]>,
@@ -60,7 +59,6 @@ impl SucForest {
             token_id: TokenId::MAX,
             priority: RuleId::MAX,
             skip_len: 0,
-            depth: 0,
             pre_id: FOREST_VIRTUAL_ROOT,
             parent: FOREST_VIRTUAL_ROOT,
             subtree_last_node: FOREST_VIRTUAL_ROOT,
@@ -76,7 +74,6 @@ impl SucForest {
                     priority: dict.priorities[token_id],
                     skip_len: 1,
                     parent,
-                    depth: 1,
                     pre_id: FOREST_VIRTUAL_ROOT,
                     subtree_last_node: node_id,
                     children: Default::default(),
@@ -152,14 +149,6 @@ impl SucForest {
                 let pre_id = token_to_node_id[dict[rule_id].pre];
                 nodes[node_id].pre_id = pre_id;
             }
-        }
-
-        for node_id in nodes.keys() {
-            if node_id == FOREST_VIRTUAL_ROOT {
-                continue;
-            }
-            let parent_id = nodes[node_id].parent;
-            nodes[node_id].depth = nodes[parent_id].depth + 1;
         }
 
         for token_id in {
