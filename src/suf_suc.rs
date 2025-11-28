@@ -4,6 +4,7 @@ use derive_more::Deref;
 use smallvec::SmallVec;
 
 use crate::{
+    SkipLen,
     aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId},
     normalize::SINGLETON_PRIORITY,
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
@@ -15,8 +16,8 @@ pub(crate) const NUM_INLINE_FOREST_NODES: usize = 4;
 #[derive(Clone, Debug)]
 pub(crate) struct SufSucNode {
     pub forest_id: ForestNodeId,
-    pub skip_len: u32,
-    pub suc_skip_len: u32,
+    pub skip_len: SkipLen,
+    pub suc_skip_len: SkipLen,
     pub depth: u32,
     pub valid_range: (ForestNodeId, ForestNodeId),
 }

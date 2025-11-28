@@ -8,6 +8,8 @@ use crate::{
     typed_vec::{TypedVec, typed_vec_index},
 };
 
+pub type SkipLen = u16;
+
 typed_vec_index!(pub(crate) ForestNodeId, u32);
 
 pub(crate) const FOREST_VIRTUAL_ROOT: ForestNodeId = ForestNodeId::ZERO;
@@ -16,7 +18,7 @@ pub(crate) const FOREST_VIRTUAL_ROOT: ForestNodeId = ForestNodeId::ZERO;
 pub(crate) struct SucNode {
     pub token_id: TokenId,
     pub priority: RuleId,
-    pub skip_len: u32,
+    pub skip_len: SkipLen,
     pub pre_id: ForestNodeId,
     pub depth: u32,
     pub parent: ForestNodeId,

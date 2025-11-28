@@ -3,7 +3,7 @@ use std::borrow::Borrow;
 use derive_more::{Constructor, Deref, From, Into};
 
 use crate::{
-    NormalizedDict, TokenId,
+    NormalizedDict, SkipLen, TokenId,
     aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId},
     centroid::SufSucCentroidTrees,
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
@@ -13,7 +13,7 @@ use crate::{
 #[derive(Clone, Copy, Debug, Into, From, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IncBpeToken {
     pub token_id: TokenId,
-    pub skip_len: u32,
+    pub skip_len: SkipLen,
 }
 
 #[derive(Debug, Deref)]
@@ -41,11 +41,11 @@ pub struct IncBpeTokenization<T> {
 }
 
 impl IncBpeToken {
-    pub fn new<I: Into<TokenId>>(token_id: I, skip_len: u32) -> Self {
+    pub fn new<I: Into<TokenId>>(token_id: I, skip_len: SkipLen) -> Self {
         Self::new_const(token_id.into(), skip_len)
     }
 
-    pub fn new_const(token_id: TokenId, skip_len: u32) -> Self {
+    pub fn new_const(token_id: TokenId, skip_len: SkipLen) -> Self {
         Self { token_id, skip_len }
     }
 }
