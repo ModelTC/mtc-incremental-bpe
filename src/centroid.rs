@@ -15,14 +15,16 @@ typed_vec_index!(pub(crate) CentroidId, u16);
 pub(crate) struct CentroidNode {
     #[deref]
     node: SufSucNode,
+    subtree_root: SubTreeNodeId,
     intervals: SmallVec<[(ForestNodeId, ForestNodeId); NUM_INLINE_FOREST_NODES]>,
     children: SmallVec<[CentroidId; NUM_INLINE_FOREST_NODES]>,
 }
 
 impl CentroidNode {
-    fn new(node: SubTreeNodeRef) -> Self {
+    fn new(node: SubTreeNodeRef, subtree_root: SubTreeNodeId) -> Self {
         Self {
             node: node.suf_suc_node.clone(),
+            subtree_root,
             intervals: Default::default(),
             children: Default::default(),
         }
@@ -173,7 +175,7 @@ impl SufSucCentroidTree {
                     .all(|&i| subtree[i].size <= half_size)
             );
 
-            let id = centroids.push(CentroidNode::new(*subtree[centroid]));
+            let id = centroids.push(CentroidNode::new(*subtree[centroid], root_id));
             if let Some(parent) = parent_centroid {
                 let parent_node = &mut centroids[parent];
                 parent_node
@@ -224,8 +226,9 @@ impl SufSucCentroidTree {
     pub fn search<F: Fn(usize) -> ForestNodeId>(&self, skip_to: F) -> ForestNodeId {
         let len = self.len();
         let to_parent = |node: CentroidId| {
-            Some(node.next())
-                .filter(|&parent| parent < len && self[parent].depth < self[node].depth)
+            Some(node.next()).filter(|&parent| {
+                parent < len && self[parent].subtree_root == self[node].subtree_root
+            })
         };
 
         let next_subtree = |node_id: CentroidId| {
@@ -257,7 +260,7 @@ impl SufSucCentroidTree {
                     current = parent;
                     continue;
                 } else {
-                    debug_assert!(false);
+                    debug_assert!(false, "{self:?}");
                     break;
                 }
             }
@@ -334,7 +337,7 @@ mod tests {
                     }
                     w == tree[v].forest_id
                 };
-                assert!(is_parent ^ (tree[v].depth >= tree[u].depth));
+                assert!(is_parent ^ (tree[v].subtree_root != tree[u].subtree_root));
             }
         }
     }
