@@ -14,5 +14,6 @@ pub use crate::{
     dict::{DictBuildError, Dictionary, Rule, RuleId, UnknownToken},
     inc_impl::{IncBpeToken, IncBpeTokenChainIter, IncBpeTokenization, IncBpeTokenizer},
     normalize::{NormalizedDict, NormalizedDictBuildError},
+    successor::SkipLen,
     vocab::{Token, TokenId, Vocab, VocabBuildError},
 };
