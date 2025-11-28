@@ -658,4 +658,27 @@ mod tests {
         let chain: Arc<[IncBpeToken]> = Arc::from(chain_base);
         verify_chain_iter(chain, build_seq());
     }
+
+    #[test]
+    fn test_inc_bpe_repeated() {
+        let vocab: Vec<_> = ["<unk>".to_owned()]
+            .into_iter()
+            .chain((1..=32).map(|i| std::iter::repeat_n('a', i).collect::<String>()))
+            .collect();
+        let vocab_ref: Vec<_> = vocab.iter().map(|s| s.as_ref()).collect();
+        inc_bpe_display_any_case(
+            &vocab_ref[..18],
+            &[
+                ("a", "a"),
+                ("aa", "a"),
+                ("aa", "aa"),
+                ("aaaa", "aaaa"),
+                ("aaaa", "aa"),
+                ("aa", "aaa"),
+                ("aaaa", "aaa"),
+                ("aaaaaaaa", "aaaaaaaa"),
+            ],
+            &vocab_ref[1..],
+        );
+    }
 }
