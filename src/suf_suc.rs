@@ -187,36 +187,15 @@ mod tests {
         suf_suc::SufSucNodeSet,
     };
 
-    fn node_set_case(rules: &[(&str, &str)]) {
-        let vocab = Vocab::new([
-            b"<unk>" as &[_],
-            b"a",
-            b"abc",
-            b"abcde",
-            b"abcdef",
-            b"b",
-            b"ba",
-            b"bc",
-            b"bcdef",
-            b"c",
-            b"cd",
-            b"cde",
-            b"cdefg",
-            b"d",
-            b"de",
-            b"def",
-            b"e",
-            b"ef",
-            b"efg",
-            b"f",
-            b"g",
-        ])
-        .unwrap();
+    fn node_set_case(vocab: &[&str], rules: &[(&str, &str)]) {
+        let vocab = Vocab::new(vocab.iter().map(|s| s.as_bytes().to_vec())).unwrap();
 
         let dict = Dictionary::new_from_token_pair(vocab, rules.iter().copied()).unwrap();
         let dict = NormalizedDict::new_in_bytes(dict.clone()).unwrap();
         let automaton = ACAutomaton::new(&dict);
         let forest = SucForest::new(&dict);
+
+        let node_set = SufSucNodeSet::new(&forest, &automaton);
 
         for (node_id, node) in forest.enumerate() {
             let s = if node_id.inner() == 0 {
@@ -224,10 +203,9 @@ mod tests {
             } else {
                 std::str::from_utf8(&dict[node.token_id]).unwrap()
             };
-            println!("{s:12} {node_id:2}: {node:?}");
+            let suf_suc_node = &node_set[node_id];
+            println!("{s:12} {node_id:2}: {node:?} {suf_suc_node:?}");
         }
-
-        let node_set = SufSucNodeSet::new(&forest, &automaton);
 
         let mut stack = vec![(AC_NODE_ROOT, automaton.children(AC_NODE_ROOT))];
         let mut cur_string = Vec::with_capacity(dict.tokens.iter().map(|t| t.len()).max().unwrap());
@@ -246,7 +224,7 @@ mod tests {
             let longest = dict
                 .tokens
                 .keys()
-                .filter(|&i| cur_string.ends_with(&dict[i]))
+                .filter(|&i| dict.is_useful(i) && cur_string.ends_with(&dict[i]))
                 .max_by_key(|&i| dict[i].len())
                 .map(|i| forest.token_to_node_id[i])
                 .unwrap_or(FOREST_VIRTUAL_ROOT);
@@ -256,12 +234,17 @@ mod tests {
 
         for (token_id, ac_node_id) in automaton.token_to_node.enumerate_copied() {
             let node_id = forest.token_to_node_id[token_id];
+            if node_id == FOREST_VIRTUAL_ROOT {
+                continue;
+            }
             assert_eq!(node_set.longest_token_node[ac_node_id], node_id);
             let token = dict.get_token(token_id).unwrap();
             let suf_parent_id = dict
                 .tokens
                 .keys()
-                .filter(|&i| token.ends_with(&dict[i]) && dict[i].len() < token.len())
+                .filter(|&i| {
+                    dict.is_useful(i) && token.ends_with(&dict[i]) && dict[i].len() < token.len()
+                })
                 .max_by_key(|&i| dict[i].len())
                 .map(|i| forest.token_to_node_id[i])
                 .unwrap_or(FOREST_VIRTUAL_ROOT);
@@ -272,35 +255,67 @@ mod tests {
 
     #[test]
     fn test_node_set() {
-        node_set_case(&[
-            ("b", "c"),
-            ("e", "f"),
-            ("d", "e"),
-            ("c", "d"),
-            ("d", "ef"),
-            ("b", "a"),
-            ("a", "bc"),
-            ("abc", "de"),
-            ("abc", "def"),
-            ("bc", "def"),
-            ("c", "de"),
-            ("ef", "g"),
-            ("cd", "efg"),
-        ]);
-        node_set_case(&[
-            ("b", "c"),
-            ("e", "f"),
-            ("d", "e"),
-            ("c", "d"),
-            ("d", "ef"),
-            ("a", "bc"),
-            ("b", "a"),
-            ("abc", "de"),
-            ("abc", "def"),
-            ("bc", "def"),
-            ("c", "de"),
-            ("ef", "g"),
-            ("cd", "efg"),
-        ]);
+        let vocab = [
+            "<unk>", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde",
+            "cdefg", "d", "de", "def", "e", "ef", "efg", "f", "g",
+        ];
+        node_set_case(
+            &vocab,
+            &[
+                ("b", "c"),
+                ("e", "f"),
+                ("d", "e"),
+                ("c", "d"),
+                ("d", "ef"),
+                ("b", "a"),
+                ("a", "bc"),
+                ("abc", "de"),
+                ("abc", "def"),
+                ("bc", "def"),
+                ("c", "de"),
+                ("ef", "g"),
+                ("cd", "efg"),
+            ],
+        );
+        node_set_case(
+            &vocab,
+            &[
+                ("b", "c"),
+                ("e", "f"),
+                ("d", "e"),
+                ("c", "d"),
+                ("d", "ef"),
+                ("a", "bc"),
+                ("b", "a"),
+                ("abc", "de"),
+                ("abc", "def"),
+                ("bc", "def"),
+                ("c", "de"),
+                ("ef", "g"),
+                ("cd", "efg"),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_repeated_suf_suc() {
+        let vocab: Vec<_> = ["<unk>".to_owned()]
+            .into_iter()
+            .chain((1..=16).map(|i| std::iter::repeat_n('a', i).collect::<String>()))
+            .collect();
+        let vocab_ref: Vec<_> = vocab.iter().map(|s| s.as_ref()).collect();
+        node_set_case(
+            &vocab_ref,
+            &[
+                ("a", "a"),
+                ("aa", "a"),
+                ("aa", "aa"),
+                ("aaaa", "aaaa"),
+                ("aaaa", "aa"),
+                ("aa", "aaa"),
+                ("aaaa", "aaa"),
+                ("aaaaaaaa", "aaaaaaaa"),
+            ],
+        );
     }
 }
