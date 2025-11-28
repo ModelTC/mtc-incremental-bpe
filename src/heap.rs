@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_heap() {
-        let mut heap = Heap::new(PosId::from(7_usize), []);
+        let mut heap = Heap::new(PosId::from(7usize), []);
         for (pos, rule_id) in [3, 9, 1, 10, 9, 6].into_iter().enumerate() {
             validate_heap(&heap);
             heap.push(PosId::from(pos + 1), KeyId(rule_id));
