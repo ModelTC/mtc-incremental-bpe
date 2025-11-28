@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, hash::Hash, ops::Index};
 
 use bytes::BytesMut;
 use derive_more::{Deref, Display, From, Into};
-use smallvec::SmallVec;
 use thiserror::Error;
+use tinyvec::TinyVec;
 
 use crate::{
     Token, TokenId, Vocab,
@@ -12,7 +12,11 @@ use crate::{
 
 typed_vec_index!(pub RuleId, u32);
 
-const NUM_INLINE_RULES: usize = 4;
+type TokenRules = TinyVec<[RuleId; 6]>;
+
+const _: () = {
+    assert!(std::mem::size_of::<TokenRules>() == 32);
+};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Into, From)]
 pub struct Rule {
@@ -26,7 +30,7 @@ pub struct Dictionary {
     #[deref]
     vocab: Vocab,
     pub(crate) rules: TypedVec<RuleId, Rule>,
-    token_to_rule_ids: TypedVec<TokenId, SmallVec<[RuleId; NUM_INLINE_RULES]>>,
+    token_to_rule_ids: TypedVec<TokenId, TokenRules>,
     pair_to_rule_id: BTreeMap<(TokenId, TokenId), RuleId>,
 }
 
@@ -46,7 +50,7 @@ pub enum DictBuildError {
 impl Dictionary {
     fn from_rules(vocab: Vocab, rules: TypedVec<RuleId, Rule>) -> Self {
         let mut token_to_rule_ids = TypedVec::from_iter(std::iter::repeat_n(
-            SmallVec::new(),
+            TokenRules::new(),
             vocab.num_of_tokens().as_usize(),
         ));
         let mut pair_to_rule_id = BTreeMap::new();

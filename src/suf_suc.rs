@@ -1,17 +1,14 @@
 use std::collections::VecDeque;
 
 use derive_more::Deref;
-use smallvec::SmallVec;
 
 use crate::{
     SkipLen,
-    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId},
+    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId, ACNodeIdVec},
     normalize::SINGLETON_PRIORITY,
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
     typed_vec::TypedVec,
 };
-
-pub(crate) const NUM_INLINE_FOREST_NODES: usize = 4;
 
 #[derive(Clone, Debug)]
 pub(crate) struct SufSucNode {
@@ -20,6 +17,10 @@ pub(crate) struct SufSucNode {
     pub suc_skip_len: SkipLen,
     pub valid_range: (ForestNodeId, ForestNodeId),
 }
+
+const _: () = {
+    assert!(std::mem::size_of::<SufSucNode>() == 16);
+};
 
 impl SufSucNode {
     #[inline(always)]
@@ -54,11 +55,8 @@ impl SufSucNodeSet {
         let mut suffix_parent: TypedVec<ForestNodeId, ForestNodeId> =
             vec![FOREST_VIRTUAL_ROOT; forest.len().as_usize()].into();
 
-        let mut suffix_children = std::iter::repeat_n(
-            SmallVec::<[ACNodeId; NUM_INLINE_FOREST_NODES]>::new(),
-            automaton.num_of_nodes().as_usize(),
-        )
-        .collect::<TypedVec<ACNodeId, _>>();
+        let mut suffix_children: TypedVec<ACNodeId, _> =
+            std::iter::repeat_n(ACNodeIdVec::new(), automaton.num_of_nodes().as_usize()).collect();
         for (node, parent) in automaton.suffix.enumerate_copied() {
             if node == AC_NODE_ROOT {
                 continue;
