@@ -171,12 +171,10 @@ impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
 }
 
 impl<T> IncBpeTokenization<T> {
-    pub fn tokens(&self) -> &[IncBpeToken] {
-        &self.tokens
-    }
-
-    pub fn into_tokens(self) -> Vec<IncBpeToken> {
-        self.tokens
+    pub fn reset(&mut self) {
+        self.tokens.clear();
+        self.forest_ids.clear();
+        self.ac_state = AC_NODE_ROOT;
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -184,11 +182,27 @@ impl<T> IncBpeTokenization<T> {
         self.forest_ids.reserve(additional);
     }
 
+    pub fn inc_tokens(&self) -> &[IncBpeToken] {
+        &self.tokens
+    }
+
+    pub fn tokenizer(&self) -> &T {
+        &self.tokenizer
+    }
+
+    pub fn into_inner(self) -> (T, Vec<IncBpeToken>) {
+        (self.tokenizer, self.tokens)
+    }
+
+    pub fn into_inc_tokens(self) -> Vec<IncBpeToken> {
+        self.tokens
+    }
+
     pub fn token_chain(&self, end_pos: usize) -> IncBpeTokenChainIter<&[IncBpeToken]> {
         IncBpeTokenChainIter::new(&self.tokens, end_pos)
     }
 
-    pub fn current_token_seq(&self) -> IncBpeTokenChainIter<&[IncBpeToken]> {
+    pub fn current_token_chain(&self) -> IncBpeTokenChainIter<&[IncBpeToken]> {
         self.token_chain(self.tokens.len().saturating_sub(1))
     }
 }
@@ -261,7 +275,7 @@ mod tests {
             };
             let res = tokenizer
                 .tokenize(single_tokens.iter().copied())
-                .into_tokens();
+                .into_inc_tokens();
             validate(&tokenizer, &single_tokens, &res);
             res
         };
@@ -524,7 +538,7 @@ mod tests {
         let tokenize = |s| {
             tokenizer
                 .tokenize(tokenizer.split_bytes_to_tokens(s, 0usize))
-                .into_tokens()
+                .into_inc_tokens()
         };
 
         let display_res = |res: &[IncBpeToken]| {
@@ -556,7 +570,9 @@ mod tests {
                     let token_ids = (0..len)
                         .map(|i| avail_token_ids[(seq >> (i * 2)) & 3])
                         .collect::<Vec<_>>();
-                    let res = tokenizer.tokenize(token_ids.iter().copied()).into_tokens();
+                    let res = tokenizer
+                        .tokenize(token_ids.iter().copied())
+                        .into_inc_tokens();
                     validate(&tokenizer, &token_ids, &res);
                 }
             }
