@@ -1,24 +1,40 @@
 use std::collections::{BTreeMap, LinkedList};
 
 use derive_more::Deref;
-use smallvec::SmallVec;
+use tinyvec::TinyVec;
 
 use crate::{
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest, SucNode},
-    suf_suc::{NUM_INLINE_FOREST_NODES, SufSucNode, SufSucNodeSet},
+    suf_suc::{SufSucNode, SufSucNodeSet},
     typed_vec::{TypedVec, typed_vec_index},
 };
 
 typed_vec_index!(pub(crate) CentroidId, u16);
+typed_vec_index!(SubTreeNodeId, u16);
+
+type IntervalVec = TinyVec<[(ForestNodeId, ForestNodeId); 4]>;
+type CentroidChildVec = TinyVec<[CentroidId; 7]>;
+type SubTreeChildVec = TinyVec<[SubTreeNodeId; 7]>;
+
+const _: () = {
+    assert!(std::mem::size_of::<IntervalVec>() == 40);
+    assert!(std::mem::size_of::<CentroidChildVec>() == 24);
+    assert!(std::mem::size_of::<SubTreeChildVec>() == 24);
+};
 
 #[derive(Debug, Deref)]
 pub(crate) struct CentroidNode {
     #[deref]
     node: SufSucNode,
     subtree_root: SubTreeNodeId,
-    intervals: SmallVec<[(ForestNodeId, ForestNodeId); NUM_INLINE_FOREST_NODES]>,
-    children: SmallVec<[CentroidId; NUM_INLINE_FOREST_NODES]>,
+    intervals: IntervalVec,
+    children: CentroidChildVec,
 }
+
+const _: () = {
+    assert!(std::mem::size_of::<CentroidNode>() == std::mem::size_of::<SufSucNode>() + 24 + 40 + 8);
+    assert!(std::mem::size_of::<[CentroidNode; 2]>() == std::mem::size_of::<CentroidNode>() * 2);
+};
 
 impl CentroidNode {
     fn new(node: SubTreeNodeRef, subtree_root: SubTreeNodeId) -> Self {
@@ -52,8 +68,6 @@ impl SufSucCentroidTrees {
     }
 }
 
-typed_vec_index!(SubTreeNodeId, u16);
-
 #[derive(Clone, Copy, Debug, Deref)]
 struct SubTreeNodeRef<'a> {
     #[deref]
@@ -66,7 +80,7 @@ struct SubTreeNode<'a> {
     #[deref]
     node: SubTreeNodeRef<'a>,
     parent: Option<SubTreeNodeId>,
-    children: SmallVec<[SubTreeNodeId; NUM_INLINE_FOREST_NODES]>,
+    children: SubTreeChildVec,
     size: u16,
 }
 

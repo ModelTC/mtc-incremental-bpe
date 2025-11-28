@@ -1,10 +1,9 @@
 use derive_more::Deref;
-use smallvec::SmallVec;
+use tinyvec::TinyVec;
 
 use crate::{
     NormalizedDict, RuleId, TokenId,
     normalize::SINGLETON_PRIORITY,
-    suf_suc::NUM_INLINE_FOREST_NODES,
     typed_vec::{TypedVec, typed_vec_index},
 };
 
@@ -14,6 +13,14 @@ typed_vec_index!(pub(crate) ForestNodeId, u32);
 
 pub(crate) const FOREST_VIRTUAL_ROOT: ForestNodeId = ForestNodeId::ZERO;
 
+pub(crate) type ForestNodeIdVec = TinyVec<[ForestNodeId; 6]>;
+type TokenIdVec = TinyVec<[TokenId; 6]>;
+
+const _: () = {
+    assert!(std::mem::size_of::<ForestNodeIdVec>() == 32);
+    assert!(std::mem::size_of::<TokenIdVec>() == 32);
+};
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SucNode {
     pub token_id: TokenId,
@@ -22,7 +29,7 @@ pub(crate) struct SucNode {
     pub pre_id: ForestNodeId,
     pub parent: ForestNodeId,
     pub subtree_last_node: ForestNodeId,
-    pub children: SmallVec<[ForestNodeId; NUM_INLINE_FOREST_NODES]>,
+    pub children: ForestNodeIdVec,
 }
 
 #[derive(Debug, Deref)]
@@ -34,12 +41,10 @@ pub(crate) struct SucForest {
 
 impl SucForest {
     pub fn new(dict: &NormalizedDict) -> Self {
-        let mut roots = Vec::with_capacity(NUM_INLINE_FOREST_NODES);
-        let mut children: TypedVec<TokenId, _> = std::iter::repeat_n(
-            SmallVec::<[TokenId; NUM_INLINE_FOREST_NODES]>::new(),
-            dict.num_of_tokens().as_usize(),
-        )
-        .collect();
+        let mut roots =
+            Vec::with_capacity(dict.tokens.keys().filter(|&i| dict.is_single(i)).count());
+        let mut children: TypedVec<TokenId, _> =
+            std::iter::repeat_n(TokenIdVec::new(), dict.num_of_tokens().as_usize()).collect();
         for (token_id, rule_id) in dict.priorities.enumerate_copied() {
             if dict.is_single(token_id) {
                 roots.push(token_id);

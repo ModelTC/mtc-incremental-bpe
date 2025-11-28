@@ -4,7 +4,7 @@ use std::{
 };
 
 use derive_more::{Debug, Deref};
-use smallvec::SmallVec;
+use tinyvec::TinyVec;
 
 use crate::{
     TokenId, Vocab,
@@ -15,17 +15,28 @@ typed_vec_index!(pub(crate) ACNodeId, u32);
 
 pub(crate) const AC_NODE_ROOT: ACNodeId = ACNodeId::ZERO;
 
-pub(crate) const NUM_INLINE_AC_NODES: usize = 8;
-
 const ALPHABET_SIZE: usize = 1 << 8;
+
+pub(crate) type ACNodeIdVec = TinyVec<[ACNodeId; 8]>;
+type ByteKeyVec = TinyVec<[u8; 14]>;
+
+const _: () = {
+    assert!(std::mem::size_of::<ACNodeIdVec>() == 40);
+    assert!(std::mem::size_of::<ByteKeyVec>() == 24);
+};
 
 #[derive(Debug)]
 struct ACNode {
     #[debug(ignore)]
     map: [ACNodeId; ALPHABET_SIZE],
-    children: SmallVec<[ACNodeId; NUM_INLINE_AC_NODES]>,
-    keys: SmallVec<[u8; NUM_INLINE_AC_NODES]>,
+    children: ACNodeIdVec,
+    keys: ByteKeyVec,
 }
+
+const _: () = {
+    assert!(std::mem::size_of::<ACNode>() == 64 + 4 * ALPHABET_SIZE);
+    assert!(std::mem::size_of::<[ACNode; 2]>() == std::mem::size_of::<ACNode>() * 2);
+};
 
 impl Default for ACNode {
     fn default() -> Self {
@@ -147,10 +158,7 @@ impl ACAutomaton {
         }
 
         let order = {
-            let mut suffix_children = TypedVec::from(vec![
-                    SmallVec::<[ACNodeId; NUM_INLINE_AC_NODES]>::new();
-                    len
-                ]);
+            let mut suffix_children = TypedVec::from(vec![ACNodeIdVec::new(); len]);
             for (cur, suf) in suffix.enumerate_copied() {
                 if cur == suf {
                     debug_assert_eq!(cur, AC_NODE_ROOT);
