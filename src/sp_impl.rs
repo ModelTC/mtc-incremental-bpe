@@ -178,34 +178,34 @@ mod tests {
         .unwrap();
 
         let dict = build_dict(&vocab, [("c", "d"), ("b", "cd"), ("a", "bcd")]);
-        check_in_bytes(&dict, "dcdbcdabcdab", [4_u32, 5, 6, 7, 1, 2]);
-        check_in_utf8(&dict, "dcdbcdabcdab", [4_u32, 5, 6, 7, 1, 2]);
+        check_in_bytes(&dict, "dcdbcdabcdab", [4u32, 5, 6, 7, 1, 2]);
+        check_in_utf8(&dict, "dcdbcdabcdab", [4u32, 5, 6, 7, 1, 2]);
 
         let dict = build_dict(
             &vocab,
             [(b"\xbd" as &[_], b"\xa0" as &[_]), (b"\xe4", b"\xbd\xa0")],
         );
-        check_in_bytes(&dict, "你好", [8_u32, 0, 0, 15]);
-        check_properly_in_utf8(&dict, "你好", [8_u32, 9]);
+        check_in_bytes(&dict, "你好", [8u32, 0, 0, 15]);
+        check_properly_in_utf8(&dict, "你好", [8u32, 9]);
         let output = dict.split_utf8_to_tokens("你好", 0usize);
         assert_eq!(output, [8, 9].map(TokenId::new));
 
         let dict = build_dict(&vocab, [("你", "好")]);
-        check_in_utf8(&dict, "你好", [11_u32]);
-        check_in_utf8(&dict, "你好呀", [11_u32, 10]);
+        check_in_utf8(&dict, "你好", [11u32]);
+        check_in_utf8(&dict, "你好呀", [11u32, 10]);
         check_in_utf8(
             &dict,
             "你好你好你好呀你好你好你",
-            [11_u32, 11, 11, 10, 11, 11, 8],
+            [11u32, 11, 11, 10, 11, 11, 8],
         );
 
         let dict = build_dict(&vocab, [("你", "好"), ("你好", "呀")]);
-        check_in_utf8(&dict, "你好", [11_u32]);
-        check_in_utf8(&dict, "你好呀", [12_u32]);
+        check_in_utf8(&dict, "你好", [11u32]);
+        check_in_utf8(&dict, "你好呀", [12u32]);
         check_in_utf8(
             &dict,
             "你好你好你好呀你好你好你",
-            [11_u32, 11, 12, 11, 11, 8],
+            [11u32, 11, 12, 11, 11, 8],
         );
 
         let check_single = |rules: &[(&str, &str)], seq: &str, tokens: &[u32]| {
