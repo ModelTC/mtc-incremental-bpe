@@ -6,6 +6,7 @@ use thiserror::Error;
 use crate::{Dictionary, RuleId, TokenId, typed_vec::TypedVec};
 
 #[derive(Clone, Debug, Error)]
+#[non_exhaustive]
 pub enum NormalizedDictBuildError {
     #[error("singleton token {suf} is a suffix of singleton token {id}, which is not allowed")]
     SingletonSuffix { id: TokenId, suf: TokenId },

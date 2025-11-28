@@ -35,6 +35,7 @@ pub struct Dictionary {
 pub struct UnknownToken(pub Token);
 
 #[derive(Clone, Debug, Error)]
+#[non_exhaustive]
 pub enum DictBuildError {
     #[error("the {pos}-th rule contains an unknown token {token}")]
     UnknownToken { pos: RuleId, token: UnknownToken },
