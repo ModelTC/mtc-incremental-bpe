@@ -143,13 +143,21 @@ impl NormalizedDict {
     }
 
     #[inline]
+    pub fn priority(&self, token_id: TokenId) -> RuleId {
+        self.priorities
+            .get(token_id)
+            .copied()
+            .unwrap_or(RuleId::MAX)
+    }
+
+    #[inline]
     pub fn is_single(&self, token_id: TokenId) -> bool {
         self.is_useful(token_id) && self.priorities[token_id] >= SINGLETON_PRIORITY
     }
 
     #[inline]
     pub fn is_useful(&self, token_id: TokenId) -> bool {
-        self.priorities[token_id] != RuleId::MAX
+        self.priority(token_id) != RuleId::MAX
     }
 }
 
