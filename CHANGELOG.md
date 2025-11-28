@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.4.1...v0.5.0) - 2025-11-28
+
+### Added
+
+- [**breaking**] rename functions and expose more for `IncBpeTokenization`
+
+### Fixed
+
+- use the roots of the subtrees as indicators of parents, fix #19
+- expose priority of a token in normalized dict, fix panic when token id exceeded vocab size
+- use `LinkedList` for suffix chain
+- check token length explicitly
+- add `non_exhaustive` to errors
+- use u16 as `skip_len`
+
+### Other
+
+- use `tinyvec` replacing `smallvec` to reduce memory footprint
+- *(tests)* add tests on repeated characters
+- unify integer literals
+
 ## [0.4.1](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.4.0...v0.4.1) - 2025-11-27
 
 ### Other
