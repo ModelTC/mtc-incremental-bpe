@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, LinkedList};
 
 use derive_more::Deref;
 use smallvec::SmallVec;
@@ -77,24 +77,24 @@ impl SufSucCentroidTree {
         }
 
         let mut subtree = {
-            let mut pool = Vec::with_capacity(NUM_INLINE_FOREST_NODES);
+            let mut chain = LinkedList::new();
             let mut cursor = start;
             while cursor != FOREST_VIRTUAL_ROOT {
                 let forest_node = &forest[cursor];
                 let suf_suc_node = &node_set[cursor];
-                pool.push(SubTreeNodeRef {
+                chain.push_back(SubTreeNodeRef {
                     forest_node,
                     suf_suc_node,
                 });
                 cursor = node_set.suffix_parent[cursor];
             }
-            pool.reverse();
-            debug_assert_eq!(pool[0].parent, FOREST_VIRTUAL_ROOT);
+            debug_assert!(!chain.is_empty());
+            debug_assert_eq!(chain.back().unwrap().parent, FOREST_VIRTUAL_ROOT);
 
             let mut forest_to_node_id = BTreeMap::new();
 
-            let mut nodes = TypedVec::<SubTreeNodeId, _>::with_capacity(pool.len());
-            for node in pool {
+            let mut nodes = TypedVec::<SubTreeNodeId, _>::with_capacity(chain.len());
+            for node in chain.into_iter().rev() {
                 let forest_id = node.suf_suc_node.forest_id;
                 if node.parent == FOREST_VIRTUAL_ROOT {
                     let id = nodes.push(SubTreeNode {
