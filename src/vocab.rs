@@ -16,6 +16,7 @@ pub struct Vocab {
 }
 
 #[derive(Clone, Debug, Error)]
+#[non_exhaustive]
 pub enum VocabBuildError {
     #[error("the token with id {id} is empty")]
     EmptyToken { id: TokenId },
