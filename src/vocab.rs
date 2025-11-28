@@ -22,6 +22,8 @@ pub enum VocabBuildError {
     EmptyToken { id: TokenId },
     #[error("duplicated tokens with id {a} and {b}")]
     Duplicated { a: TokenId, b: TokenId },
+    #[error("token {id} is too long, exceeded 16-bit unsigned integer")]
+    TokenTooLong { id: TokenId },
 }
 
 impl Vocab {
@@ -37,6 +39,8 @@ impl Vocab {
                 let id = TokenId::from(k);
                 if token.is_empty() {
                     Err(VocabBuildError::EmptyToken { id })
+                } else if token.len() > u16::MAX as usize {
+                    Err(VocabBuildError::TokenTooLong { id })
                 } else if let Some(other) = token_to_id.insert(token.clone(), id) {
                     Err(VocabBuildError::Duplicated { a: other, b: id })
                 } else {
