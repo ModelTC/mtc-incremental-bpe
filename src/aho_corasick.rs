@@ -112,11 +112,52 @@ impl ACTrie {
         &self.nodes[node_id].children
     }
 
-    pub fn children(&self, node_id: ACNodeId) -> impl Iterator<Item = (ACNodeId, u8)> {
+    pub fn children(&self, node_id: ACNodeId) -> impl DoubleEndedIterator<Item = (ACNodeId, u8)> {
         let node = &self.nodes[node_id];
         debug_assert_eq!(node.children.len(), node.keys.len());
         node.children.iter().copied().zip(node.keys.iter().copied())
     }
+}
+
+fn heavy_light_relabeling(trie: &ACTrie) -> TypedVec<ACNodeId, ACNodeId> {
+    let len = trie.num_of_nodes().as_usize();
+    let mut size: TypedVec<ACNodeId, u32> = vec![1; len].into();
+    let mut largest: TypedVec<ACNodeId, _> = vec![AC_NODE_ROOT; len].into();
+    let mut stack = vec![(AC_NODE_ROOT, None::<ACNodeId>, trie.children(AC_NODE_ROOT))];
+    while let Some((node_id, parent_id, child_iter)) = stack.last_mut() {
+        let node_id = *node_id;
+        if let Some((child_id, _)) = child_iter.next() {
+            stack.push((child_id, Some(node_id), trie.children(child_id)));
+            continue;
+        }
+        if let Some(parent_id) = *parent_id {
+            let cur_size = size[node_id];
+            size[parent_id] += cur_size;
+            if largest[parent_id] == AC_NODE_ROOT || size[largest[parent_id]] < cur_size {
+                largest[parent_id] = node_id;
+            }
+        }
+        stack.pop();
+    }
+    let mut stack = vec![AC_NODE_ROOT];
+    let mut order = TypedVec::with_capacity(len);
+    while let Some(mut head) = stack.pop() {
+        loop {
+            order.push(head);
+            let next_head = largest[head];
+            if next_head == AC_NODE_ROOT {
+                break;
+            }
+            for (child_id, _) in trie.children(head).rev() {
+                if child_id != next_head {
+                    stack.push(child_id);
+                }
+            }
+            head = next_head;
+        }
+    }
+    debug_assert_eq!(order.as_slice().len(), len);
+    order
 }
 
 #[derive(Debug, Deref)]
@@ -206,7 +247,10 @@ impl ACAutomaton {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Vocab, aho_corasick::ACAutomaton};
+    use crate::{
+        Vocab,
+        aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId, ACTrie, heavy_light_relabeling},
+    };
 
     #[test]
     fn test_ac_automaton() {
@@ -244,5 +288,27 @@ mod tests {
             let suffix = automaton.suffix[node];
             println!("{node:2} {suffix:2}: {}", str::from_utf8(token).unwrap());
         }
+    }
+
+    #[test]
+    fn test_ac_heavy_light_decomposition() {
+        let mut trie = ACTrie::default();
+        for token in ["abcd", "aaa", "acd", "rose", "rad", "rand", "rb"] {
+            let mut node = AC_NODE_ROOT;
+            for &byte in token.as_bytes() {
+                node = trie.get_or_add(node, byte);
+            }
+        }
+        let res = heavy_light_relabeling(&trie);
+        let expected = [0, 9, 13, 15, 16, 14, 10, 11, 12, 17, 1, 2, 3, 4, 5, 6, 7, 8];
+        dbg!(&res, &expected);
+        assert!(
+            expected
+                .iter()
+                .copied()
+                .map(ACNodeId)
+                .zip(res)
+                .all(|(u, v)| u == v)
+        );
     }
 }
