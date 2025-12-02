@@ -71,7 +71,7 @@ impl Dictionary {
         rule_iter: R,
     ) -> Result<Self, DictBuildError> {
         let rule_iter = rule_iter.into_iter();
-        let mut rules = TypedVec::with_capacity(rule_iter.size_hint().0);
+        let mut rules = TypedVec::with_capacity(RuleId::from(rule_iter.size_hint().0));
         let get_token = |pos, id| {
             vocab
                 .get_token(id)
@@ -104,7 +104,7 @@ impl Dictionary {
         rule_iter: R,
     ) -> Result<Self, DictBuildError> {
         let rule_iter = rule_iter.into_iter();
-        let mut rules = TypedVec::with_capacity(rule_iter.size_hint().0);
+        let mut rules = TypedVec::with_capacity(RuleId::from(rule_iter.size_hint().0));
         let get_id = |pos, token: &[u8]| {
             vocab
                 .find_token_id(token)

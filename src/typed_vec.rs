@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use std::{
+    iter::FusedIterator,
     marker::PhantomData,
     ops::{Index, IndexMut},
 };
@@ -37,6 +38,13 @@ impl<I, T: PartialEq> PartialEq for TypedVec<I, T> {
 impl<I, T: Eq> Eq for TypedVec<I, T> {}
 
 impl<I: TypedVecIndex, T> TypedVec<I, T> {
+    pub fn with_capacity(capacity: I) -> Self {
+        Self {
+            inner: Vec::with_capacity(capacity.into_usize()),
+            _phantom: PhantomData,
+        }
+    }
+
     #[inline(always)]
     pub fn push(&mut self, val: T) -> I {
         let len = self.len();
@@ -72,7 +80,9 @@ impl<I: TypedVecIndex, T> TypedVec<I, T> {
         }
     }
 
-    pub fn enumerate(&self) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator {
+    pub fn enumerate(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator + FusedIterator {
         self.inner
             .iter()
             .enumerate()
@@ -81,33 +91,28 @@ impl<I: TypedVecIndex, T> TypedVec<I, T> {
 
     pub fn enumerate_mut(
         &mut self,
-    ) -> impl DoubleEndedIterator<Item = (I, &mut T)> + ExactSizeIterator {
+    ) -> impl DoubleEndedIterator<Item = (I, &mut T)> + ExactSizeIterator + FusedIterator {
         self.inner
             .iter_mut()
             .enumerate()
             .map(|(i, t)| (I::from_usize(i), t))
     }
 
-    pub fn keys(&self) -> impl DoubleEndedIterator<Item = I> + ExactSizeIterator + 'static {
+    pub fn keys(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = I> + ExactSizeIterator + FusedIterator + 'static {
         (0..self.len().into_usize()).map(I::from_usize)
     }
 }
 
 impl<I, T> TypedVec<I, T> {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            inner: Vec::with_capacity(capacity),
-            _phantom: PhantomData,
-        }
-    }
-
     #[inline(always)]
     pub fn pop(&mut self) -> Option<T> {
         self.inner.pop()
     }
 
     #[inline(always)]
-    pub fn is_empty(&mut self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
@@ -117,7 +122,7 @@ impl<I, T> TypedVec<I, T> {
     }
 
     #[inline(always)]
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + FusedIterator {
         self.inner.iter()
     }
 
@@ -135,7 +140,13 @@ impl<I, T> AsRef<[T]> for TypedVec<I, T> {
 }
 
 impl<I: TypedVecIndex, T: Clone> TypedVec<I, T> {
-    pub fn enumerate_cloned(&self) -> impl DoubleEndedIterator<Item = (I, T)> + ExactSizeIterator {
+    pub fn new_with(element: T, capacity: I) -> Self {
+        vec![element; capacity.into_usize()].into()
+    }
+
+    pub fn enumerate_cloned(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (I, T)> + ExactSizeIterator + FusedIterator {
         self.inner
             .iter()
             .cloned()
@@ -145,7 +156,9 @@ impl<I: TypedVecIndex, T: Clone> TypedVec<I, T> {
 }
 
 impl<I: TypedVecIndex, T: Copy> TypedVec<I, T> {
-    pub fn enumerate_copied(&self) -> impl DoubleEndedIterator<Item = (I, T)> + ExactSizeIterator {
+    pub fn enumerate_copied(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (I, T)> + ExactSizeIterator + FusedIterator {
         self.inner
             .iter()
             .copied()
@@ -188,6 +201,12 @@ impl<I, T> FromIterator<T> for TypedVec<I, T> {
 pub(crate) trait TypedVecIndex: 'static + PartialEq + PartialOrd {
     fn into_usize(self) -> usize;
     fn from_usize(val: usize) -> Self;
+}
+
+pub fn vec_with_head<T, I: TypedVecIndex>(head: T, cap: I) -> Vec<T> {
+    let mut stack = TypedVec::with_capacity(cap);
+    stack.push(head);
+    stack.inner
 }
 
 macro_rules! from_usize {

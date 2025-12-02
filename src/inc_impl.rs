@@ -4,7 +4,7 @@ use derive_more::{Constructor, Deref, From, Into};
 
 use crate::{
     NormalizedDict, SkipLen, TokenId,
-    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId},
+    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId, ACTransTable},
     centroid::SufSucCentroidTrees,
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
     suf_suc::SufSucNodeSet,
@@ -20,7 +20,7 @@ pub struct IncBpeToken {
 pub struct IncBpeTokenizer {
     #[deref]
     dict: NormalizedDict,
-    automaton: ACAutomaton,
+    automaton: ACTransTable,
     forest: SucForest,
     node_set: SufSucNodeSet,
     trees: SufSucCentroidTrees,
@@ -58,7 +58,7 @@ impl IncBpeTokenizer {
         let trees = SufSucCentroidTrees::new(&node_set, &forest);
         Self {
             dict,
-            automaton,
+            automaton: automaton.trans_table,
             forest,
             node_set,
             trees,

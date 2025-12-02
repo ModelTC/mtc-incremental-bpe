@@ -88,7 +88,7 @@ impl SufSucCentroidTree {
     pub fn new(start: ForestNodeId, node_set: &SufSucNodeSet, forest: &SucForest) -> Self {
         if start == FOREST_VIRTUAL_ROOT {
             return Self {
-                nodes: TypedVec::with_capacity(0),
+                nodes: TypedVec::with_capacity(CentroidId::ZERO),
             };
         }
 
@@ -109,7 +109,7 @@ impl SufSucCentroidTree {
 
             let mut forest_to_node_id = BTreeMap::new();
 
-            let mut nodes = TypedVec::<SubTreeNodeId, _>::with_capacity(chain.len());
+            let mut nodes = TypedVec::with_capacity(SubTreeNodeId::from(chain.len()));
             for node in chain.into_iter().rev() {
                 let forest_id = node.suf_suc_node.forest_id;
                 if node.parent == FOREST_VIRTUAL_ROOT {
@@ -147,7 +147,7 @@ impl SufSucCentroidTree {
         };
 
         let mut roots = vec![(SubTreeNodeId::ZERO, None::<CentroidId>)];
-        let mut centroids = TypedVec::<CentroidId, _>::with_capacity(subtree.len().as_usize());
+        let mut centroids = TypedVec::with_capacity(CentroidId::from(subtree.len().inner()));
 
         while let Some((root_id, parent_centroid)) = roots.pop() {
             let half_size = subtree[root_id].size / 2;

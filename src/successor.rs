@@ -41,10 +41,10 @@ pub(crate) struct SucForest {
 
 impl SucForest {
     pub fn new(dict: &NormalizedDict) -> Self {
-        let mut roots =
-            Vec::with_capacity(dict.tokens.keys().filter(|&i| dict.is_single(i)).count());
-        let mut children: TypedVec<TokenId, _> =
-            std::iter::repeat_n(TokenIdVec::new(), dict.num_of_tokens().as_usize()).collect();
+        let num_tokens = dict.num_of_tokens();
+
+        let mut roots = Vec::with_capacity(num_tokens.as_usize());
+        let mut children = TypedVec::new_with(TokenIdVec::new(), num_tokens);
         for (token_id, rule_id) in dict.priorities.enumerate_copied() {
             if dict.is_single(token_id) {
                 roots.push(token_id);
@@ -58,8 +58,7 @@ impl SucForest {
             vec.sort_by_key(|&i| !dict.priorities[i]);
         }
 
-        let mut token_to_node_id: TypedVec<TokenId, ForestNodeId> =
-            vec![FOREST_VIRTUAL_ROOT; dict.num_of_tokens().as_usize()].into();
+        let mut token_to_node_id = TypedVec::new_with(FOREST_VIRTUAL_ROOT, num_tokens);
         let virtual_root = SucNode {
             token_id: TokenId::MAX,
             priority: RuleId::MAX,
@@ -69,7 +68,8 @@ impl SucForest {
             subtree_last_node: FOREST_VIRTUAL_ROOT,
             children: Default::default(),
         };
-        let mut nodes: TypedVec<ForestNodeId, SucNode> = vec![virtual_root].into();
+        let mut nodes = TypedVec::with_capacity(ForestNodeId::new(dict.num_of_tokens().inner()));
+        nodes.push(virtual_root);
 
         let mut alloc = {
             |token_id: TokenId, parent: ForestNodeId| {
