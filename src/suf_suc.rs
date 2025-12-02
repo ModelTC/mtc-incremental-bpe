@@ -4,7 +4,7 @@ use derive_more::Deref;
 
 use crate::{
     SkipLen,
-    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId, ACNodeIdVec},
+    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId},
     normalize::SINGLETON_PRIORITY,
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
     typed_vec::TypedVec,
@@ -45,30 +45,22 @@ pub(crate) struct SufSucNodeSet {
 
 impl SufSucNodeSet {
     pub fn new(forest: &SucForest, automaton: &ACAutomaton) -> Self {
-        let mut longest_token_node: TypedVec<ACNodeId, ForestNodeId> =
-            vec![FOREST_VIRTUAL_ROOT; automaton.num_of_nodes().as_usize()].into();
+        let automaton_size = automaton.num_of_nodes();
+        let forest_size = forest.len();
+
+        let mut longest_token_node = TypedVec::new_with(FOREST_VIRTUAL_ROOT, automaton_size);
         for (token_id, ac_node_id) in automaton.token_to_node.enumerate_copied() {
             let forest_node_id = forest.token_to_node_id[token_id];
             longest_token_node[ac_node_id] = forest_node_id;
         }
 
-        let mut suffix_parent: TypedVec<ForestNodeId, ForestNodeId> =
-            vec![FOREST_VIRTUAL_ROOT; forest.len().as_usize()].into();
+        let mut suffix_parent = TypedVec::new_with(FOREST_VIRTUAL_ROOT, forest_size);
 
-        let mut suffix_children: TypedVec<ACNodeId, _> =
-            std::iter::repeat_n(ACNodeIdVec::new(), automaton.num_of_nodes().as_usize()).collect();
-        for (node, parent) in automaton.suffix.enumerate_copied() {
-            if node == AC_NODE_ROOT {
-                continue;
-            }
-            suffix_children[parent].push(node);
-        }
-
-        let mut queue = VecDeque::new();
+        let mut queue = VecDeque::with_capacity(automaton_size.as_usize());
         queue.push_back(AC_NODE_ROOT);
         while let Some(node) = queue.pop_front() {
             let cur_longest = longest_token_node[node];
-            for &child in &suffix_children[node] {
+            for child in automaton.suffix.children(node) {
                 if longest_token_node[child] == FOREST_VIRTUAL_ROOT {
                     longest_token_node[child] = cur_longest;
                 } else {
@@ -123,7 +115,7 @@ impl SufSucNodeSet {
             }
         };
 
-        let nodes: TypedVec<ForestNodeId, SufSucNode> = forest
+        let nodes: TypedVec<ForestNodeId, _> = forest
             .enumerate()
             .map(|(i, node)| SufSucNode {
                 forest_id: i,
@@ -201,7 +193,7 @@ mod tests {
             println!("{s:12} {node_id:2}: {node:?} {suf_suc_node:?}");
         }
 
-        let mut stack = vec![(AC_NODE_ROOT, automaton.children(AC_NODE_ROOT))];
+        let mut stack = vec![(AC_NODE_ROOT, automaton.trie.children(AC_NODE_ROOT))];
         let mut cur_string = Vec::with_capacity(dict.tokens.iter().map(|t| t.len()).max().unwrap());
         println!("{:?}", automaton.token_to_node);
         while let Some((ac_node_id, child_iter)) = stack.last_mut() {
@@ -213,7 +205,7 @@ mod tests {
                 }
                 continue;
             };
-            stack.push((child, automaton.children(child)));
+            stack.push((child, automaton.trie.children(child)));
             cur_string.push(byte);
             let longest = dict
                 .tokens
