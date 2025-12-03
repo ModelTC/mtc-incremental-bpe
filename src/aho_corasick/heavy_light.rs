@@ -3,7 +3,7 @@ use crate::{
     typed_vec::{TypedVec, vec_with_head},
 };
 
-pub(super) fn heavy_light_decomposition(trie: &ACTrie) -> Relabeling {
+pub(super) fn heavy_light_decomposition(trie: &ACTrie) -> Relabeling<ACNodeId> {
     let len = trie.len();
 
     let mut size = TypedVec::new_with(1u32, len);
@@ -49,6 +49,7 @@ pub(super) fn heavy_light_decomposition(trie: &ACTrie) -> Relabeling {
             head = next_head;
         }
     }
+    debug_assert_eq!(order[AC_NODE_ROOT], AC_NODE_ROOT);
     debug_assert_eq!(order.len(), len);
     Relabeling::new(order)
 }
@@ -72,7 +73,6 @@ mod tests {
         let relabeling = heavy_light_decomposition(&trie);
         let order = relabeling.apply_to_typed_vec(trie.keys().collect::<TypedVec<ACNodeId, _>>());
         let expected = [0, 9, 13, 15, 16, 14, 17, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
-        dbg!(&order, expected);
         assert!(
             expected
                 .iter()

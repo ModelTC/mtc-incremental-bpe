@@ -127,6 +127,13 @@ impl<I, T> TypedVec<I, T> {
     }
 
     #[inline(always)]
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = &mut T> + ExactSizeIterator + FusedIterator {
+        self.inner.iter_mut()
+    }
+
+    #[inline(always)]
     pub fn last(&self) -> Option<&T> {
         self.inner.last()
     }
