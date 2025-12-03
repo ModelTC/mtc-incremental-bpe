@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.5.0...v0.5.1) - 2025-12-03
+
+### Added
+
+- heavy light decomposition
+
+### Other
+
+- *(deps)* update `derive_more`
+- keep transition table in the order of heavy chains
+- *(aho_corasik)* use sqrt decomposition to reduce memory footprint
+
 ## [0.5.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.4.1...v0.5.0) - 2025-11-28
 
 ### Added
