@@ -59,7 +59,7 @@ impl ACTrie {
         }
     }
 
-    pub(super) fn apply_relabeling(mut self, relabeling: &Relabeling) -> ACTrie {
+    pub(super) fn apply_relabeling(mut self, relabeling: &Relabeling<ACNodeId>) -> ACTrie {
         self.nodes = relabeling.apply_to_typed_vec(self.nodes);
         for node in &mut self.nodes {
             relabeling.apply_to_iter_mut(node.values_mut());

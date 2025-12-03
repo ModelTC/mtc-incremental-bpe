@@ -1,5 +1,5 @@
 use crate::{
-    aho_corasick::{AC_NODE_ROOT, ACNodeId, ACSuffixLinkTree, ACTrie},
+    aho_corasick::{AC_NODE_ROOT, ACNodeId, ACSuffixLinkTree, ACTrie, relabeling::Relabeling},
     typed_vec::{TypedVec, typed_vec_index},
 };
 
@@ -31,6 +31,7 @@ pub(crate) struct ACTransTable {
 struct TransTableBuilder {
     table: ACTransTable,
     owner: TypedVec<TransId, ACNodeId>,
+    parent_trans: TypedVec<ACNodeId, TransId>,
 }
 
 impl TransTableBuilder {
@@ -42,11 +43,13 @@ impl TransTableBuilder {
         trans.push([AC_NODE_ROOT; TRANS_TILE]);
         owner.push(ACNodeId::MAX);
 
+        let parent_trans = TypedVec::new_with(DEFAULT_TRANS_ID, num_nodes);
         let base = TypedVec::new_with([DEFAULT_TRANS_ID; TRANS_TILE], num_nodes);
 
         Self {
             table: ACTransTable { trans, base },
             owner,
+            parent_trans,
         }
     }
 
@@ -60,6 +63,7 @@ impl TransTableBuilder {
             self.table.base[from][high] = trans_id;
         }
         self.table.trans[trans_id][low] = to;
+        self.parent_trans[to] = trans_id;
     }
 
     #[inline(always)]
@@ -80,7 +84,24 @@ impl ACTransTable {
             }
         }
 
-        builder.table
+        let num_trans = builder.owner.len();
+        let mut visited = TypedVec::new_with(false, num_trans);
+        let mut order = TypedVec::with_capacity(num_trans);
+        for trans_id in builder.parent_trans {
+            if visited[trans_id] {
+                continue;
+            }
+            visited[trans_id] = true;
+            order.push(trans_id);
+        }
+        debug_assert_eq!(order[DEFAULT_TRANS_ID], DEFAULT_TRANS_ID);
+        debug_assert_eq!(order.len(), num_trans);
+        let relabeling = Relabeling::new(order);
+
+        let mut table = builder.table;
+        table.trans = relabeling.apply_to_typed_vec(table.trans);
+        relabeling.apply_to_iter_mut(table.base.iter_mut().flat_map(|b| b.iter_mut()));
+        table
     }
 
     #[inline(always)]

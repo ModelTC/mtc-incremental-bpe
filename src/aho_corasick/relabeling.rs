@@ -1,38 +1,27 @@
-use crate::{
-    aho_corasick::{AC_NODE_ROOT, ACNodeId},
-    typed_vec::TypedVec,
-};
+use crate::typed_vec::{TypedVec, TypedVecIndex};
 
 #[derive(Debug)]
-pub(super) struct Relabeling {
-    order: TypedVec<ACNodeId, ACNodeId>,
-    rank: TypedVec<ACNodeId, ACNodeId>,
+pub(super) struct Relabeling<I> {
+    order: TypedVec<I, I>,
+    rank: TypedVec<I, I>,
 }
 
-impl Relabeling {
-    pub fn new(order: TypedVec<ACNodeId, ACNodeId>) -> Self {
-        debug_assert!(!order.is_empty());
-        let mut rank = TypedVec::new_with(AC_NODE_ROOT, order.len());
+impl<I: TypedVecIndex + Copy> Relabeling<I> {
+    pub fn new(order: TypedVec<I, I>) -> Self {
+        let mut rank = TypedVec::new_with(I::from_usize(0), order.len());
         for (new_id, old_id) in order.enumerate_copied() {
-            debug_assert!(
-                (old_id == AC_NODE_ROOT && new_id == AC_NODE_ROOT)
-                    || (old_id != AC_NODE_ROOT && rank[old_id] == AC_NODE_ROOT)
-            );
             rank[old_id] = new_id;
         }
         Self { order, rank }
     }
 
-    pub fn apply_to_typed_vec<T: Default>(
-        &self,
-        mut seq: TypedVec<ACNodeId, T>,
-    ) -> TypedVec<ACNodeId, T> {
+    pub fn apply_to_typed_vec<T: Default>(&self, mut seq: TypedVec<I, T>) -> TypedVec<I, T> {
         seq.keys()
             .map(|i| std::mem::take(&mut seq[self.order[i]]))
             .collect()
     }
 
-    pub fn apply_to_iter_mut<'a>(&self, iter: impl IntoIterator<Item = &'a mut ACNodeId>) {
+    pub fn apply_to_iter_mut<'a>(&self, iter: impl IntoIterator<Item = &'a mut I>) {
         for slot in iter {
             *slot = self.rank[*slot];
         }
