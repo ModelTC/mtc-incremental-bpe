@@ -97,7 +97,10 @@ pub fn bpe_with_heap<const ALLOW_IMPROPER_RULES: bool>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{Dictionary, TokenId, Vocab, test_utils::bpe::bpe_with_heap};
+    use crate::{
+        Dictionary, TokenId, Vocab,
+        test_utils::{bpe_with_heap, bytes_into_tokens, utf8_into_tokens},
+    };
 
     fn build_dict<T: AsRef<[u8]>, R: IntoIterator<Item = (T, T)>>(
         vocab: &Vocab,
@@ -111,8 +114,9 @@ mod tests {
         seq: S,
         tokens: T,
     ) {
+        let seq = seq.as_ref();
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
+        let inputs = bytes_into_tokens(dict, seq, 0usize);
         assert_eq!(bpe_with_heap::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_bytes().is_ok());
         check_properly_in_bytes(dict, seq, tokens);
@@ -123,8 +127,9 @@ mod tests {
         seq: S,
         tokens: T,
     ) {
+        let seq = seq.as_ref();
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
+        let inputs = utf8_into_tokens(dict, seq, 0usize);
         assert_eq!(bpe_with_heap::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_utf8().is_ok());
         check_properly_in_utf8(dict, seq, tokens);
@@ -136,7 +141,7 @@ mod tests {
         tokens: T,
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
+        let inputs = bytes_into_tokens(dict, seq, 0usize);
         assert_eq!(bpe_with_heap::<false>(dict, inputs), tokens);
     }
 
@@ -146,7 +151,7 @@ mod tests {
         tokens: T,
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
-        let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
+        let inputs = utf8_into_tokens(dict, seq, 0usize);
         assert_eq!(bpe_with_heap::<false>(dict, inputs), tokens);
     }
 
@@ -186,7 +191,7 @@ mod tests {
         );
         check_in_bytes(&dict, "你好", [8u32, 0, 0, 15]);
         check_properly_in_utf8(&dict, "你好", [8u32, 9]);
-        let output = dict.split_utf8_to_tokens("你好", 0usize);
+        let output = utf8_into_tokens(&dict, "你好", 0usize);
         assert_eq!(output, [8, 9].map(TokenId::new));
 
         let dict = build_dict(&vocab, [("你", "好")]);
