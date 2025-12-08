@@ -213,7 +213,7 @@ mod tests {
 
     use crate::{
         Dictionary, IncBpeToken, IncBpeTokenChainIter, IncBpeTokenizer, NormalizedDict, TokenId,
-        Vocab, sp_impl::sentence_piece_impl,
+        Vocab, test_utils::bpe_with_heap,
     };
 
     fn inc_bpe_short_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
@@ -244,7 +244,7 @@ mod tests {
 
     fn validate(dict: &Dictionary, seq: &[TokenId], inc_res: &[IncBpeToken]) {
         for i in 0..seq.len() {
-            let expected = sentence_piece_impl::<false>(dict, &seq[0..i + 1]);
+            let expected = bpe_with_heap::<false>(dict, &seq[0..i + 1]);
             let output = IncBpeTokenChainIter::new(inc_res, i).token_ids();
             let output = output.chain(std::iter::repeat(TokenId::MAX));
             assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));

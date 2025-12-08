@@ -1,4 +1,3 @@
-#![cfg(test)]
 use crate::typed_vec::{TypedVec, TypedVecIndex, typed_vec_index};
 
 typed_vec_index!(NodeId, u32);
@@ -6,7 +5,7 @@ typed_vec_index!(NodeId, u32);
 const ROOT: NodeId = NodeId::ZERO.next();
 
 #[derive(Debug)]
-pub(crate) struct AdjustableHeap<Pos, Key> {
+pub(super) struct AdjustableHeap<Pos, Key> {
     nodes: TypedVec<NodeId, (Key, Pos)>,
     pos_to_node_id: TypedVec<Pos, NodeId>,
 }
@@ -186,7 +185,7 @@ mod tests {
     use rand::{Rng, SeedableRng, rngs::StdRng};
 
     use crate::{
-        heap::AdjustableHeap,
+        test_utils::heap::AdjustableHeap,
         typed_vec::{TypedVec, typed_vec_index},
     };
 

@@ -1,7 +1,6 @@
-#![cfg(test)]
 use crate::{
     Dictionary, RuleId, TokenId,
-    heap::AdjustableHeap,
+    test_utils::heap::AdjustableHeap,
     typed_vec::{TypedVec, typed_vec_index},
 };
 
@@ -9,7 +8,7 @@ typed_vec_index!(pub(super) InputTextPos, u32);
 
 type Heap = AdjustableHeap<InputTextPos, RuleId>;
 
-pub fn sentence_piece_impl<const ALLOW_IMPROPER_RULES: bool>(
+pub fn bpe_with_heap<const ALLOW_IMPROPER_RULES: bool>(
     dict: &Dictionary,
     seq: impl Into<Vec<TokenId>>,
 ) -> Vec<TokenId> {
@@ -98,7 +97,7 @@ pub fn sentence_piece_impl<const ALLOW_IMPROPER_RULES: bool>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{Dictionary, TokenId, Vocab, sp_impl::sentence_piece_impl};
+    use crate::{Dictionary, TokenId, Vocab, test_utils::bpe::bpe_with_heap};
 
     fn build_dict<T: AsRef<[u8]>, R: IntoIterator<Item = (T, T)>>(
         vocab: &Vocab,
@@ -114,7 +113,7 @@ mod tests {
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
         let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
-        assert_eq!(sentence_piece_impl::<true>(dict, inputs), tokens);
+        assert_eq!(bpe_with_heap::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_bytes().is_ok());
         check_properly_in_bytes(dict, seq, tokens);
     }
@@ -126,7 +125,7 @@ mod tests {
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
         let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
-        assert_eq!(sentence_piece_impl::<true>(dict, inputs), tokens);
+        assert_eq!(bpe_with_heap::<true>(dict, inputs), tokens);
         assert!(dict.is_proper_in_utf8().is_ok());
         check_properly_in_utf8(dict, seq, tokens);
     }
@@ -138,7 +137,7 @@ mod tests {
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
         let inputs = dict.split_bytes_to_tokens(seq.as_ref(), 0usize);
-        assert_eq!(sentence_piece_impl::<false>(dict, inputs), tokens);
+        assert_eq!(bpe_with_heap::<false>(dict, inputs), tokens);
     }
 
     fn check_properly_in_utf8<S: AsRef<str>, I: Into<TokenId>, T: IntoIterator<Item = I>>(
@@ -148,11 +147,11 @@ mod tests {
     ) {
         let tokens: Vec<_> = tokens.into_iter().map(I::into).collect();
         let inputs = dict.split_utf8_to_tokens(seq.as_ref(), 0usize);
-        assert_eq!(sentence_piece_impl::<false>(dict, inputs), tokens);
+        assert_eq!(bpe_with_heap::<false>(dict, inputs), tokens);
     }
 
     #[test]
-    fn test_sp_impl() {
+    fn test_bpe_with_heap() {
         let vocab = Vocab::new([
             b"<unk>" as &[_],
             b"a",
