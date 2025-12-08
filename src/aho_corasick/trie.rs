@@ -22,7 +22,7 @@ pub(crate) struct BfsIter<'t> {
 impl Default for ACTrie {
     fn default() -> Self {
         Self {
-            nodes: vec![Default::default()].into(),
+            nodes: [Default::default()].into_iter().collect(),
         }
     }
 }

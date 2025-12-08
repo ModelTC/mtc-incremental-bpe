@@ -21,7 +21,8 @@ pub fn bpe_with_heap<const ALLOW_IMPROPER_RULES: bool>(
     let mut next_split_pos: TypedVec<InputTextPos, _> =
         (1..seq_len + 1).map(InputTextPos::from).collect();
     debug_assert!(next_split_pos.enumerate_copied().all(|(i, j)| i < j));
-    let mut prev_split_pos = TypedVec::from(vec![InputTextPos::ZERO; seq_len + 1]);
+    let mut prev_split_pos =
+        TypedVec::new_with(InputTextPos::ZERO, InputTextPos::from(seq_len + 1));
     for (cur, next) in next_split_pos.enumerate_copied() {
         if next < prev_split_pos.len() {
             prev_split_pos[next] = cur;

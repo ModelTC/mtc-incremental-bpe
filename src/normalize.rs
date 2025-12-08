@@ -37,9 +37,8 @@ impl NormalizedDict {
         dict: Dictionary,
         mut is_single: F,
     ) -> Result<Self, NormalizedDictBuildError> {
-        let len = dict.num_of_tokens().as_usize();
-        let mut priorities = TypedVec::<TokenId, _>::from(vec![RuleId::MAX; len]);
-        let mut useful_rules: BTreeMap<(TokenId, TokenId), RuleId> = Default::default();
+        let mut priorities = TypedVec::new_with(RuleId::MAX, dict.num_of_tokens());
+        let mut useful_rules = BTreeMap::new();
 
         for (token_id, priority) in priorities.enumerate_mut() {
             if is_single(&dict, token_id, &dict[token_id]) {

@@ -56,9 +56,8 @@ pub(super) fn heavy_light_decomposition(trie: &ACTrie) -> Relabeling<ACNodeId> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        aho_corasick::{AC_NODE_ROOT, ACNodeId, ACTrie, heavy_light::heavy_light_decomposition},
-        typed_vec::TypedVec,
+    use crate::aho_corasick::{
+        AC_NODE_ROOT, ACNodeId, ACTrie, heavy_light::heavy_light_decomposition,
     };
 
     #[test]
@@ -71,16 +70,10 @@ mod tests {
             }
         }
         let relabeling = heavy_light_decomposition(&trie);
-        let order = relabeling.apply_to_typed_vec(trie.keys().collect::<TypedVec<ACNodeId, _>>());
+        let order = relabeling.apply_to_typed_vec(trie.keys().collect());
+        let order: Vec<_> = order.into_iter().map(|i| i.inner()).collect();
         let expected = [0, 9, 13, 15, 16, 14, 17, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
-        assert!(
-            expected
-                .iter()
-                .copied()
-                .map(ACNodeId::new)
-                .zip(order)
-                .all(|(u, v)| u == v)
-        );
+        assert_eq!(order, expected);
 
         let trie = trie.apply_relabeling(&relabeling);
 
@@ -90,10 +83,10 @@ mod tests {
             (2, &[(3, b'n'), (5, b'd')]),
             (10, &[(11, b'b'), (14, b'a'), (16, b'c')]),
         ] {
-            let mut children = trie
+            let mut children: Vec<_> = trie
                 .children(ACNodeId::new(node_id))
                 .map(|(u, v)| (u.inner(), v))
-                .collect::<Vec<_>>();
+                .collect();
             children.sort();
             let expected = expected.to_vec();
             assert_eq!(children, expected);

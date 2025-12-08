@@ -168,7 +168,7 @@ where
             cur = cur.prev();
         }
 
-        let mut pos_to_node_id = TypedVec::from(vec![NodeId::ZERO; pos_size.into_usize()]);
+        let mut pos_to_node_id = TypedVec::new_with(NodeId::ZERO, pos_size);
         for (node_id, (_, pos)) in nodes.enumerate().skip(1) {
             pos_to_node_id[*pos] = node_id;
         }
@@ -224,7 +224,7 @@ mod tests {
 
     fn rand_test(pos_size: u32, key_size: u32, num_ops: usize, seed: u64) {
         let mut rng = StdRng::seed_from_u64(seed);
-        let mut cur_keys = TypedVec::from(vec![None::<KeyId>; pos_size as usize]);
+        let mut cur_keys = TypedVec::new_with(None::<KeyId>, PosId::new(pos_size));
         let mut heap = Heap::new(PosId(pos_size), []);
         validate_heap(&heap);
         for _ in 0..num_ops {

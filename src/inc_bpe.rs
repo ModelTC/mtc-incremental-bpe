@@ -391,7 +391,7 @@ mod tests {
                 }
             }
         }
-        let multiple_a_s = multiple_a_s.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+        let multiple_a_s: Vec<_> = multiple_a_s.iter().map(|s| s.as_str()).collect();
         inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
         let rules = [("a", "a"), ("aa", "aa"), ("aa", "a"), ("aaaa", "a")];
         inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
@@ -568,9 +568,9 @@ mod tests {
             let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict).unwrap());
             for len in 1..9 {
                 for seq in 0..(1 << (len * 2)) {
-                    let token_ids = (0..len)
+                    let token_ids: Vec<_> = (0..len)
                         .map(|i| avail_token_ids[(seq >> (i * 2)) & 3])
-                        .collect::<Vec<_>>();
+                        .collect();
                     let res = tokenizer
                         .tokenize(token_ids.iter().copied())
                         .into_inc_tokens();
@@ -662,9 +662,9 @@ mod tests {
 
     #[test]
     fn test_inc_bpe_repeated() {
-        let vocab: Vec<_> = ["<unk>".to_owned()]
+        let vocab: Vec<String> = ["<unk>".to_owned()]
             .into_iter()
-            .chain((1..=32).map(|i| std::iter::repeat_n('a', i).collect::<String>()))
+            .chain((1..=32).map(|i| std::iter::repeat_n('a', i).collect()))
             .collect();
         let vocab_ref: Vec<_> = vocab.iter().map(|s| s.as_ref()).collect();
         inc_bpe_display_any_case(

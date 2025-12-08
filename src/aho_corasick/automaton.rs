@@ -134,7 +134,7 @@ mod tests {
         assert!(search("bcdefg").is_none());
         let id_cdefg = search("cdefg").unwrap();
 
-        let feed = |sequences: &[&str]| {
+        let feed = |sequences: &[&str]| -> Vec<_> {
             let mut node = AC_NODE_ROOT;
             sequences
                 .iter()
@@ -142,7 +142,7 @@ mod tests {
                     node = automaton.feed(node, s);
                     node
                 })
-                .collect::<Vec<_>>()
+                .collect()
         };
 
         let output = feed(&["b", "a", "bcd", "ef", "g"]);
