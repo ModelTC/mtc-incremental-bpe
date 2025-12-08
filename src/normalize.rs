@@ -163,7 +163,7 @@ impl NormalizedDict {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Dictionary, NormalizedDict, RuleId, Vocab, sp_impl::sentence_piece_impl};
+    use crate::{Dictionary, NormalizedDict, RuleId, Vocab, test_utils::bpe_with_heap};
 
     fn build_dict<T: AsRef<[u8]>, R: IntoIterator<Item = (T, T)>>(
         vocab: &Vocab,
@@ -178,7 +178,7 @@ mod tests {
             let token_id = rule.merged;
             assert!(!dict.is_single(token_id));
             let seq = &dict[token_id];
-            let res = sentence_piece_impl::<false>(&dict, dict.split_bytes_to_tokens(seq, 0usize));
+            let res = bpe_with_heap::<false>(&dict, dict.split_bytes_to_tokens(seq, 0usize));
             assert!(dict.is_useful(token_id) ^ (res != vec![token_id]));
         }
         dict
@@ -196,7 +196,7 @@ mod tests {
                 }
             };
             assert!(!dict.is_single(token_id));
-            let res = sentence_piece_impl::<false>(&dict, dict.split_utf8_to_tokens(seq, 0usize));
+            let res = bpe_with_heap::<false>(&dict, dict.split_utf8_to_tokens(seq, 0usize));
             assert!(dict.is_useful(token_id) ^ (res != vec![token_id]));
         }
         dict
