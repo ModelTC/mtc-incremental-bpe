@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_bpe_with_heap() {
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"b",
             b"c",

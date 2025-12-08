@@ -46,6 +46,8 @@ pub enum DictBuildError {
     UnknownToken { pos: RuleId, token: UnknownToken },
     #[error("the {pos}-th rule contains an unknown token id {id}")]
     UnknownTokenId { pos: RuleId, id: TokenId },
+    #[error("the {pos}-th rule contains an empty token id {id}")]
+    EmptyToken { pos: RuleId, id: TokenId },
 }
 
 impl Dictionary {
@@ -77,6 +79,13 @@ impl Dictionary {
             vocab
                 .get_token(id)
                 .ok_or(DictBuildError::UnknownTokenId { pos, id })
+                .and_then(|t| {
+                    if t.is_empty() {
+                        Err(DictBuildError::EmptyToken { pos, id })
+                    } else {
+                        Ok(t)
+                    }
+                })
         };
         for (pos, (left, right)) in rule_iter.map(|(i, j)| (i.into(), j.into())).enumerate() {
             let pos = RuleId::from(pos);

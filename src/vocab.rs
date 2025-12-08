@@ -140,6 +140,7 @@ mod tests {
     #[test]
     fn test_vocab() {
         assert!(Vocab::new([b"abc" as &[_], b"abcd"]).is_ok());
+        assert!(Vocab::new([b"" as &[_], b"abc", b""]).is_ok());
 
         let vocab = Vocab::new([b"a" as &[_], b"b", b"c", b"d", b"cd", b"bcd", b"abcd"]).unwrap();
 
