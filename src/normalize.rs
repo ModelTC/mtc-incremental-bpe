@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-
 use derive_more::Deref;
+use rapidhash::{HashMapExt, RapidHashMap};
 use thiserror::Error;
 
 use crate::{Dictionary, RuleId, TokenId, typed_vec::TypedVec};
@@ -18,7 +17,7 @@ pub struct NormalizedDict {
     dict: Dictionary,
     pub(crate) priorities: TypedVec<TokenId, RuleId>,
     #[cfg(test)]
-    pub(crate) useful_rules: BTreeMap<(TokenId, TokenId), RuleId>,
+    pub(crate) useful_rules: RapidHashMap<(TokenId, TokenId), RuleId>,
 }
 
 pub(crate) const SINGLETON_PRIORITY: RuleId = {
@@ -37,8 +36,9 @@ impl NormalizedDict {
         dict: Dictionary,
         mut is_single: F,
     ) -> Result<Self, NormalizedDictBuildError> {
-        let mut priorities = TypedVec::new_with(RuleId::MAX, dict.num_of_tokens());
-        let mut useful_rules = BTreeMap::new();
+        let capacity = dict.num_of_tokens();
+        let mut priorities = TypedVec::new_with(RuleId::MAX, capacity);
+        let mut useful_rules = RapidHashMap::with_capacity(capacity.as_usize());
 
         for (token_id, priority) in priorities.enumerate_mut() {
             if is_single(&dict, token_id, &dict[token_id]) {

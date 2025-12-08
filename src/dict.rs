@@ -1,7 +1,8 @@
-use std::{collections::BTreeMap, hash::Hash, ops::Index};
+use std::{hash::Hash, ops::Index};
 
 use bytes::BytesMut;
 use derive_more::{Deref, Display, From, Into};
+use rapidhash::{HashMapExt, RapidHashMap};
 use thiserror::Error;
 use tinyvec::TinyVec;
 
@@ -31,7 +32,7 @@ pub struct Dictionary {
     vocab: Vocab,
     pub(crate) rules: TypedVec<RuleId, Rule>,
     token_to_rule_ids: TypedVec<TokenId, TokenRules>,
-    pair_to_rule_id: BTreeMap<(TokenId, TokenId), RuleId>,
+    pair_to_rule_id: RapidHashMap<(TokenId, TokenId), RuleId>,
 }
 
 #[derive(Clone, Debug, Display)]
@@ -53,7 +54,7 @@ impl Dictionary {
             TokenRules::new(),
             vocab.num_of_tokens().as_usize(),
         ));
-        let mut pair_to_rule_id = BTreeMap::new();
+        let mut pair_to_rule_id = RapidHashMap::with_capacity(rules.len().as_usize());
         for (id, rule) in rules.enumerate() {
             token_to_rule_ids[rule.merged].push(id);
             pair_to_rule_id.insert((rule.pre, rule.suc), id);

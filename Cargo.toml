@@ -22,6 +22,7 @@ exclude = ["release-plz.toml", ".github"]
 [dependencies]
 bytes = "1.11.0"
 derive_more = { version = "2.1.0", features = ["add", "constructor", "debug", "deref", "deref_mut", "display", "from", "into", "into_iterator", "not"] }
+rapidhash = "4.1.1"
 thiserror = "2.0.17"
 tinyvec = { version = "1.10.0", features = ["alloc"] }
 
