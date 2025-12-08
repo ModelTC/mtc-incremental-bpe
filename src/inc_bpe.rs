@@ -213,7 +213,8 @@ mod tests {
 
     use crate::{
         Dictionary, IncBpeToken, IncBpeTokenChainIter, IncBpeTokenizer, NormalizedDict, TokenId,
-        Vocab, test_utils::bpe_with_heap,
+        Vocab,
+        test_utils::{bpe_with_heap, bytes_into_tokens, utf8_into_tokens},
     };
 
     fn inc_bpe_short_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
@@ -267,11 +268,11 @@ mod tests {
             .unwrap(),
         );
 
-        let tokenize = |s| {
+        let tokenize = |s: &str| {
             let single_tokens = if IN_BYTES {
-                tokenizer.split_bytes_to_tokens(s, 0usize)
+                bytes_into_tokens(&tokenizer, s, 0usize)
             } else {
-                tokenizer.split_utf8_to_tokens(s, 0usize)
+                utf8_into_tokens(&tokenizer, s, 0usize)
             };
             let res = tokenizer
                 .tokenize(single_tokens.iter().copied())
@@ -537,7 +538,7 @@ mod tests {
         let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict).unwrap());
         let tokenize = |s| {
             tokenizer
-                .tokenize(tokenizer.split_bytes_to_tokens(s, 0usize))
+                .tokenize(bytes_into_tokens(&tokenizer, s, 0usize))
                 .into_inc_tokens()
         };
 

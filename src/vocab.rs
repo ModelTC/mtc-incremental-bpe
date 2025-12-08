@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, ops::Index};
+use std::{collections::HashMap, hash::Hash, iter::FusedIterator, ops::Index};
 
 use bytes::Bytes;
 use thiserror::Error;
@@ -9,49 +9,78 @@ typed_vec_index!(pub TokenId, u32);
 
 pub type Token = Bytes;
 
+pub const MAX_TOKEN_LENGTH: usize = (1 << 14) - 1;
+
 #[derive(Clone, Debug)]
 pub struct Vocab {
     pub(crate) tokens: TypedVec<TokenId, Token>,
     token_to_id: HashMap<Token, TokenId>,
+    u8_to_id: [TokenId; 1 << 8],
+    char_to_id: HashMap<char, TokenId>,
 }
 
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum VocabBuildError {
-    #[error("the token with id {id} is empty")]
-    EmptyToken { id: TokenId },
     #[error("duplicated tokens with id {a} and {b}")]
     Duplicated { a: TokenId, b: TokenId },
-    #[error("token {id} is too long, exceeded 16-bit unsigned integer")]
+    #[error("token {id} is too long, exceeded {MAX_TOKEN_LENGTH}")]
     TokenTooLong { id: TokenId },
+}
+
+fn utf8_char_token(token: &[u8]) -> Option<char> {
+    if token.is_empty() || token.len() > 4 {
+        return None;
+    }
+    let Ok(s) = str::from_utf8(token) else {
+        return None;
+    };
+    debug_assert!(!s.is_empty());
+    let mut iter = s.chars();
+    let res = iter.next().unwrap();
+    if iter.next().is_none() {
+        Some(res)
+    } else {
+        None
+    }
 }
 
 impl Vocab {
     pub fn new<T: Into<Token>, I: IntoIterator<Item = T>>(
         iter: I,
     ) -> Result<Self, VocabBuildError> {
-        let mut token_to_id = HashMap::new();
+        let mut token_to_id = HashMap::default();
+        let mut u8_to_id = [TokenId::MAX; _];
+        let mut char_to_id = HashMap::default();
         let tokens: TypedVec<_, _> = iter
             .into_iter()
             .enumerate()
             .map(|(k, token)| {
                 let token = token.into();
                 let id = TokenId::from(k);
-                if token.is_empty() {
-                    Err(VocabBuildError::EmptyToken { id })
-                } else if token.len() > u16::MAX as usize {
+                if token.len() == 1 {
+                    u8_to_id[token.as_ref()[0] as usize] = id;
+                }
+                if let Some(c) = utf8_char_token(&token) {
+                    char_to_id.insert(c, id);
+                }
+                if token.len() > MAX_TOKEN_LENGTH {
                     Err(VocabBuildError::TokenTooLong { id })
-                } else if let Some(other) = token_to_id.insert(token.clone(), id) {
+                } else if !token.is_empty()
+                    && let Some(other) = token_to_id.insert(token.clone(), id)
+                {
                     Err(VocabBuildError::Duplicated { a: other, b: id })
                 } else {
                     Ok(token)
                 }
             })
             .collect::<Result<_, _>>()?;
-        debug_assert_eq!(tokens.as_slice().len(), token_to_id.len());
+        debug_assert!(tokens.as_slice().len() >= token_to_id.len());
         Ok(Self {
             tokens,
             token_to_id,
+            u8_to_id,
+            char_to_id,
         })
     }
 
@@ -75,39 +104,19 @@ impl Vocab {
         &self.token_to_id
     }
 
-    pub fn split_bytes_to_tokens<S: AsRef<[u8]>>(
+    pub fn split_bytes_to_tokens(
         &self,
-        seq: S,
-        unknown_token_id: impl Into<TokenId>,
-    ) -> Vec<TokenId> {
-        let unknown_token_id = unknown_token_id.into();
-        seq.as_ref()
-            .windows(1)
-            .map(|i| self.find_token_id(i).unwrap_or(unknown_token_id))
-            .collect()
+        seq: &[u8],
+    ) -> impl DoubleEndedIterator<Item = Option<TokenId>> + ExactSizeIterator + FusedIterator {
+        seq.iter()
+            .map(move |&b| Some(self.u8_to_id[b as usize]).filter(|&i| i != TokenId::MAX))
     }
 
-    pub fn split_utf8_to_tokens<S: AsRef<str>>(
+    pub fn split_utf8_to_tokens(
         &self,
-        seq: S,
-        unknown_token_id: impl Into<TokenId>,
-    ) -> Vec<TokenId> {
-        let unknown_token_id = unknown_token_id.into();
-        let seq = seq.as_ref();
-        let mut left = 0;
-        let mut res = Vec::with_capacity(seq.len());
-        for right in 1..seq.len() + 1 {
-            if !seq.is_char_boundary(right) {
-                continue;
-            }
-            res.push(
-                self.find_token_id(&seq.as_bytes()[left..right])
-                    .unwrap_or(unknown_token_id),
-            );
-            left = right;
-        }
-        debug_assert_eq!(res.len(), seq.chars().count());
-        res
+        seq: &str,
+    ) -> impl DoubleEndedIterator<Item = Option<TokenId>> + FusedIterator {
+        seq.chars().map(|c| self.char_to_id.get(&c).copied())
     }
 }
 
@@ -122,12 +131,14 @@ impl Index<TokenId> for Vocab {
 
 #[cfg(test)]
 mod tests {
-    use crate::{TokenId, Vocab};
+    use crate::{
+        TokenId, Vocab,
+        test_utils::{bytes_into_tokens, utf8_into_tokens},
+    };
 
     #[test]
     fn test_vocab() {
         assert!(Vocab::new([b"abc" as &[_], b"abcd"]).is_ok());
-        assert!(Vocab::new([b"a" as &[_], b"", b"b"]).is_err());
 
         let vocab = Vocab::new([b"a" as &[_], b"b", b"c", b"d", b"cd", b"bcd", b"abcd"]).unwrap();
 
@@ -173,22 +184,11 @@ mod tests {
         ])
         .unwrap();
 
-        let expected = [
-            12,
-            13,
-            14,
-            vocab.num_of_tokens().inner(),
-            vocab.num_of_tokens().inner(),
-            13,
-        ];
-        assert_eq!(
-            vocab.split_bytes_to_tokens("你好", vocab.num_of_tokens()),
-            expected.map(TokenId::new),
-        );
+        let expected = [12, 13, 14, u32::MAX, u32::MAX, 13];
+        let output = bytes_into_tokens(&vocab, "你好", u32::MAX);
+        assert_eq!(output, expected.map(TokenId::new));
 
-        assert_eq!(
-            vocab.split_utf8_to_tokens("你好", vocab.num_of_tokens()),
-            [7, 8].map(TokenId::new),
-        );
+        let output = utf8_into_tokens(&vocab, "你好", u32::MAX);
+        assert_eq!(output, [7, 8].map(TokenId::new));
     }
 }
