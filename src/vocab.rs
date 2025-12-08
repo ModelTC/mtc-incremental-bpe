@@ -1,6 +1,7 @@
-use std::{collections::HashMap, hash::Hash, iter::FusedIterator, ops::Index};
+use std::{hash::Hash, iter::FusedIterator, ops::Index};
 
 use bytes::Bytes;
+use rapidhash::RapidHashMap;
 use thiserror::Error;
 
 use crate::typed_vec::{TypedVec, typed_vec_index};
@@ -14,9 +15,9 @@ pub const MAX_TOKEN_LENGTH: usize = (1 << 14) - 1;
 #[derive(Clone, Debug)]
 pub struct Vocab {
     pub(crate) tokens: TypedVec<TokenId, Token>,
-    token_to_id: HashMap<Token, TokenId>,
+    token_to_id: RapidHashMap<Token, TokenId>,
     u8_to_id: Box<[TokenId; 1 << 8]>,
-    char_to_id: HashMap<char, TokenId>,
+    char_to_id: RapidHashMap<char, TokenId>,
 }
 
 #[derive(Clone, Debug, Error)]
@@ -49,9 +50,9 @@ impl Vocab {
     pub fn new<T: Into<Token>, I: IntoIterator<Item = T>>(
         iter: I,
     ) -> Result<Self, VocabBuildError> {
-        let mut token_to_id = HashMap::default();
+        let mut token_to_id = RapidHashMap::default();
         let mut u8_to_id = Box::new([TokenId::MAX; _]);
-        let mut char_to_id = HashMap::default();
+        let mut char_to_id = RapidHashMap::default();
         let tokens: TypedVec<_, _> = iter
             .into_iter()
             .enumerate()
@@ -100,7 +101,7 @@ impl Vocab {
         self.tokens.as_slice()
     }
 
-    pub fn token_to_id_map(&self) -> &HashMap<Token, TokenId> {
+    pub fn token_to_id_map(&self) -> &RapidHashMap<Token, TokenId> {
         &self.token_to_id
     }
 
