@@ -6,7 +6,6 @@ description = "Incremental BPE tokenization for all prefixes"
 repository = "https://github.com/ModelTC/mtc-incremental-bpe"
 homepage = "https://github.com/ModelTC/mtc-incremental-bpe"
 documentation = "https://docs.rs/mtc-incremental-bpe"
-authors = ["Chielo Newctle <ChieloNewctle@gmail.com>"]
 
 [package]
 name = "mtc-incremental-bpe"
@@ -17,7 +16,6 @@ description.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
-authors.workspace = true
 readme = "README.md"
 exclude = ["release-plz.toml", ".github"]
 
