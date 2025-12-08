@@ -41,7 +41,11 @@ impl NormalizedDict {
         let mut useful_rules = RapidHashMap::with_capacity(capacity.as_usize());
 
         for (token_id, priority) in priorities.enumerate_mut() {
-            if is_single(&dict, token_id, &dict[token_id]) {
+            let token = &dict[token_id];
+            if token.is_empty() {
+                continue;
+            }
+            if is_single(&dict, token_id, token) {
                 debug_assert!(token_id.as_usize() < SINGLETON_PRIORITY.as_usize());
                 let mut p = SINGLETON_PRIORITY;
                 *p.inner_mut() += token_id.inner();
@@ -226,7 +230,7 @@ mod tests {
     #[test]
     fn test_normalized_dict() {
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"b",
             b"c",
@@ -343,7 +347,7 @@ mod tests {
         useful_rules(&normalized, [0, 2]);
 
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"abc",
             b"abcde",

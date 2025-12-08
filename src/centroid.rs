@@ -300,7 +300,7 @@ mod tests {
 
     fn centroid_case(rules: &[(&str, &str)]) {
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"abc",
             b"abcde",
@@ -336,7 +336,11 @@ mod tests {
                 continue;
             }
             let token = &dict[forest[id].token_id];
-            let num_valid_tokens = dict.tokens.iter().filter(|i| token.ends_with(i)).count();
+            let num_valid_tokens = dict
+                .tokens
+                .iter()
+                .filter(|t| !t.is_empty() && token.ends_with(t))
+                .count();
             assert_eq!(num_valid_tokens, tree.len().as_usize());
             for u in tree.keys() {
                 let v = u.next();

@@ -242,8 +242,8 @@ mod tests {
     #[test]
     fn test_node_set() {
         let vocab = [
-            "<unk>", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde",
-            "cdefg", "d", "de", "def", "e", "ef", "efg", "f", "g",
+            "", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde", "cdefg",
+            "d", "de", "def", "e", "ef", "efg", "f", "g",
         ];
         node_set_case(
             &vocab,
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_repeated_suf_suc() {
-        let vocab: Vec<String> = ["<unk>".to_owned()]
+        let vocab: Vec<String> = ["".to_owned()]
             .into_iter()
             .chain((1..=16).map(|i| std::iter::repeat_n('a', i).collect()))
             .collect();

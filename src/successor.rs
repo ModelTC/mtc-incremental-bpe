@@ -150,7 +150,7 @@ impl SucForest {
 
             let rule_id = nodes[node_id].priority;
             if rule_id < SINGLETON_PRIORITY {
-                debug_assert!(rule_id < dict.rules.len());
+                debug_assert!(rule_id < dict.num_of_rules());
                 let pre_id = token_to_node_id[dict[rule_id].pre];
                 nodes[node_id].pre_id = pre_id;
             }
@@ -158,7 +158,7 @@ impl SucForest {
 
         for token_id in {
             let mut order: Vec<_> = dict.tokens.keys().collect();
-            order.sort_unstable_by_key(|&i| dict[i].len());
+            order.sort_by_key(|&i| dict[i].len());
             order
         } {
             let node_id = token_to_node_id[token_id];
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_suc_forest() {
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"abc",
             b"abcde",

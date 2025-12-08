@@ -300,8 +300,8 @@ mod tests {
     #[test]
     fn test_inc_bpe_short() {
         let vocab = [
-            "<unk>", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde",
-            "cdefg", "d", "de", "def", "e", "ef", "efg", "f", "g",
+            "", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde", "cdefg",
+            "d", "de", "def", "e", "ef", "efg", "f", "g",
         ];
         inc_bpe_display_any_case(
             &vocab,
@@ -342,7 +342,7 @@ mod tests {
             &["abcdefg", "babcdefg", "cdefg"],
         );
 
-        let vocab = ["<unk>", "a", "aa", "aaa", "aaaa", "aaaaa"];
+        let vocab = ["", "a", "aa", "aaa", "aaaa", "aaaaa"];
         let rules = [("a", "a"), ("aa", "a"), ("aa", "aa"), ("aa", "aaa")];
         let seq = [
             "a", "aa", "aaa", "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", "aaaaaaaa",
@@ -375,7 +375,7 @@ mod tests {
             }
         }
 
-        let vocab = ["<unk>", "a", "aa", "aaa", "aaaa", "aaaaa"];
+        let vocab = ["", "a", "aa", "aaa", "aaaa", "aaaaa"];
         let rules = [("a", "a"), ("aa", "a"), ("aa", "aa"), ("aa", "aaa")];
         let mut multiple_a_s: Vec<_> = [
             "a", "aa", "aaa", "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", "aaaaaaaa",
@@ -401,7 +401,7 @@ mod tests {
         inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
 
         let vocab = [
-            "<unk>",
+            "",
             "a",
             "b",
             "c",
@@ -455,8 +455,8 @@ mod tests {
     #[test]
     fn test_inc_bpe_non_longest() {
         let vocab = [
-            "<unk>", "a", "b", "c", "d", "e", "f", "g", "h", "i", "ab", "ba", "bc", "cd", "de",
-            "ef", "gh", "hi", "cde", "ghi", "fghi", "abcd", "fg", "efgh", "efghi", "bcd", "defgh",
+            "", "a", "b", "c", "d", "e", "f", "g", "h", "i", "ab", "ba", "bc", "cd", "de", "ef",
+            "gh", "hi", "cde", "ghi", "fghi", "abcd", "fg", "efgh", "efghi", "bcd", "defgh",
             "bcde", "bcdef", "bcdefgh",
         ];
         let rules = [
@@ -510,7 +510,7 @@ mod tests {
 
     fn inc_bpe_demo_case(rules: &[(&str, &str)]) {
         let vocab = Vocab::new([
-            b"<unk>" as &[_],
+            b"" as &[_],
             b"a",
             b"abc",
             b"abcde",
@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn test_inc_bpe_repeated() {
-        let vocab: Vec<String> = ["<unk>".to_owned()]
+        let vocab: Vec<String> = ["".to_owned()]
             .into_iter()
             .chain((1..=32).map(|i| std::iter::repeat_n('a', i).collect()))
             .collect();
