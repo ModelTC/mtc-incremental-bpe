@@ -105,19 +105,26 @@ impl Vocab {
         &self.token_to_id
     }
 
+    pub fn find_by_byte(&self, b: u8) -> Option<TokenId> {
+        Some(self.u8_to_id[b as usize]).filter(|&i| i != TokenId::MAX)
+    }
+
+    pub fn find_by_char(&self, c: char) -> Option<TokenId> {
+        self.char_to_id.get(&c).copied()
+    }
+
     pub fn split_bytes_to_tokens(
         &self,
         seq: &[u8],
     ) -> impl DoubleEndedIterator<Item = Option<TokenId>> + ExactSizeIterator + FusedIterator {
-        seq.iter()
-            .map(move |&b| Some(self.u8_to_id[b as usize]).filter(|&i| i != TokenId::MAX))
+        seq.iter().map(|&b| self.find_by_byte(b))
     }
 
     pub fn split_utf8_to_tokens(
         &self,
         seq: &str,
     ) -> impl DoubleEndedIterator<Item = Option<TokenId>> + FusedIterator {
-        seq.chars().map(|c| self.char_to_id.get(&c).copied())
+        seq.chars().map(|c| self.find_by_char(c))
     }
 }
 
