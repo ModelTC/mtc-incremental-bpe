@@ -285,9 +285,9 @@ mod tests {
 
     #[test]
     fn test_repeated_suf_suc() {
-        let vocab: Vec<_> = ["<unk>".to_owned()]
+        let vocab: Vec<String> = ["<unk>".to_owned()]
             .into_iter()
-            .chain((1..=16).map(|i| std::iter::repeat_n('a', i).collect::<String>()))
+            .chain((1..=16).map(|i| std::iter::repeat_n('a', i).collect()))
             .collect();
         let vocab_ref: Vec<_> = vocab.iter().map(|s| s.as_ref()).collect();
         node_set_case(
