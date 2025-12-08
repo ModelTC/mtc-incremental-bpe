@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.5.0...v0.6.0) - 2025-12-08
+
+### Added
+
+- expose byte and char lookup operations
+- support empty tokens
+- add built-in byte and char lookup tables to `Vocab`
+- heavy light decomposition
+
+### Fixed
+
+- use rapidhash instead of default hash
+- move byte to token id table to heap
+
+### Other
+
+- make use of type inference
+- remove `two_diff_mut` from `TypedVec`
+- remove authors field in Cargo.toml
+- *(tests)* move heap bpe into test utils
+- *(deps)* update `derive_more`
+- keep transition table in the order of heavy chains
+- *(aho_corasik)* use sqrt decomposition to reduce memory footprint
+
 ## [0.5.0](https://github.com/ModelTC/mtc-incremental-bpe/compare/v0.4.1...v0.5.0) - 2025-11-28
 
 ### Added
