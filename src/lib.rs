@@ -11,7 +11,7 @@ mod vocab;
 
 pub use crate::{
     dict::{DictBuildError, Dictionary, Rule, RuleId, UnknownToken},
-    eager::{EagerBpeToken, EagerBpeTokenization},
+    eager::EagerBpeTokenization,
     inc_bpe::{IncBpeToken, IncBpeTokenChainIter, IncBpeTokenization, IncBpeTokenizer},
     normalize::{NormalizedDict, NormalizedDictBuildError},
     successor::SkipLen,

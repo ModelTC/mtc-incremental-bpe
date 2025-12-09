@@ -1,18 +1,12 @@
 use std::{borrow::Borrow, collections::VecDeque};
 
-use derive_more::{Debug, From, Into};
+use derive_more::Debug;
 
 use crate::{
     IncBpeToken, IncBpeTokenization, IncBpeTokenizer, SkipLen, TokenId,
     aho_corasick::{AC_NODE_ROOT, ACNodeId},
     successor::{FOREST_VIRTUAL_ROOT, ForestNodeId},
 };
-
-#[derive(Clone, Copy, Debug, Into, From, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EagerBpeToken {
-    pub token_id: TokenId,
-    pub feed_len: u16,
-}
 
 #[derive(Debug)]
 struct EagerTokenNode {
@@ -215,7 +209,7 @@ impl<T> EagerBpeTokenization<T> {
 }
 
 impl<T> Iterator for EagerBpeTokenization<T> {
-    type Item = EagerBpeToken;
+    type Item = IncBpeToken;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.num_roots != 1 {
@@ -227,21 +221,21 @@ impl<T> Iterator for EagerBpeTokenization<T> {
         }
         let EagerTokenNode {
             forest_id: _,
-            feed_len,
+            feed_len: _,
             token_id,
-            skip_len: _,
+            skip_len,
             num_alive_children,
         } = self.nodes.pop_front()?;
         self.useful_offset -= 1;
         self.num_roots = num_alive_children;
-        Some(EagerBpeToken { token_id, feed_len })
+        Some(IncBpeToken::const_new(token_id, skip_len))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        Dictionary, EagerBpeToken, IncBpeTokenizer, NormalizedDict, TokenId, Vocab,
+        Dictionary, IncBpeToken, IncBpeTokenizer, NormalizedDict, TokenId, Vocab,
         test_utils::{bpe_with_heap, bytes_into_tokens, utf8_into_tokens},
     };
 
@@ -271,7 +265,7 @@ mod tests {
         eager_bpe_case::<IN_BYTES, true>(vocab, rules, sequences);
     }
 
-    fn validate(dict: &Dictionary, seq: &[TokenId], eager_res: &[EagerBpeToken]) {
+    fn validate(dict: &Dictionary, seq: &[TokenId], eager_res: &[IncBpeToken]) {
         let expected = bpe_with_heap::<false>(dict, seq);
         let output: Vec<_> = eager_res.iter().map(|&t| t.token_id).collect();
         assert_eq!(output, expected);
@@ -321,7 +315,7 @@ mod tests {
             output
         };
 
-        let display_res = |res: &[EagerBpeToken]| {
+        let display_res = |res: &[IncBpeToken]| {
             if DISPLAY {
                 let msg = String::from_iter(res.iter().map(|t| {
                     let token = str::from_utf8(&tokenizer[t.token_id]).unwrap();
@@ -596,7 +590,7 @@ mod tests {
             res
         };
 
-        let display_res = |res: &[EagerBpeToken]| {
+        let display_res = |res: &[IncBpeToken]| {
             let msg = String::from_iter(res.iter().map(|t| {
                 let token = str::from_utf8(&tokenizer[t.token_id]).unwrap();
                 format!("[{token} ({})], ", t.token_id)
