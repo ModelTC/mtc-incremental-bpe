@@ -17,6 +17,7 @@ pub(crate) struct ACAutomaton {
     pub trie: ACTrie,
     pub suffix: ACSuffixLinkTree,
     pub token_to_node: TypedVec<TokenId, ACNodeId>,
+    pub depths: TypedVec<ACNodeId, u16>,
 }
 
 impl ACAutomaton {
@@ -57,12 +58,21 @@ impl ACAutomaton {
 
         let trans_table = ACTransTable::new(&trie, &suffix);
 
+        let mut depths = TypedVec::new_with(0u16, trie.len());
+        trie.bfs().for_each(|node| {
+            let val = depths[node] + 1;
+            for (child, _) in trie.children(node) {
+                depths[child] = val;
+            }
+        });
+
         Self {
             trans_table,
             #[cfg(test)]
             trie,
             suffix,
             token_to_node,
+            depths,
         }
     }
 }

@@ -1,132 +1,136 @@
-use std::borrow::Borrow;
+use std::{borrow::Borrow, collections::VecDeque};
 
-use derive_more::{Constructor, Debug, Deref, From, Into};
+use derive_more::{Debug, From, Into};
 
 use crate::{
-    NormalizedDict, SkipLen, TokenId,
-    aho_corasick::{AC_NODE_ROOT, ACAutomaton, ACNodeId, ACTransTable},
-    centroid::SufSucCentroidTrees,
-    successor::{FOREST_VIRTUAL_ROOT, ForestNodeId, SucForest},
-    suf_suc::SufSucNodeSet,
-    typed_vec::TypedVec,
+    IncBpeToken, IncBpeTokenization, IncBpeTokenizer, SkipLen, TokenId,
+    aho_corasick::{AC_NODE_ROOT, ACNodeId},
+    successor::{FOREST_VIRTUAL_ROOT, ForestNodeId},
 };
 
 #[derive(Clone, Copy, Debug, Into, From, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IncBpeToken {
+pub struct EagerBpeToken {
     pub token_id: TokenId,
-    pub skip_len: SkipLen,
-}
-
-#[derive(Debug, Deref)]
-pub struct IncBpeTokenizer {
-    #[deref]
-    dict: NormalizedDict,
-    pub(crate) trans_table: ACTransTable,
-    pub(crate) ac_depths: TypedVec<ACNodeId, u16>,
-    pub(crate) forest: SucForest,
-    pub(crate) node_set: SufSucNodeSet,
-    pub(crate) trees: SufSucCentroidTrees,
-}
-
-#[derive(Clone, Debug, Constructor, Into, From)]
-pub struct IncBpeTokenChainIter<S> {
-    seq: S,
-    pos: usize,
+    pub feed_len: u16,
 }
 
 #[derive(Debug)]
-pub struct IncBpeTokenization<T> {
-    #[debug(ignore)]
-    tokenizer: T,
-    ac_state: ACNodeId,
-    tokens: Vec<IncBpeToken>,
-    forest_ids: Vec<ForestNodeId>,
+struct EagerTokenNode {
+    forest_id: ForestNodeId,
+    token_id: TokenId,
+    skip_len: SkipLen,
+    num_alive_children: u16,
+    feed_len: u16,
 }
 
-impl IncBpeToken {
-    pub const fn const_new(token_id: TokenId, skip_len: SkipLen) -> Self {
-        Self { token_id, skip_len }
-    }
-
-    pub fn new<I: Into<TokenId>>(token_id: I, skip_len: SkipLen) -> Self {
-        Self::const_new(token_id.into(), skip_len)
-    }
+#[derive(Debug)]
+pub struct EagerBpeTokenization<T> {
+    #[debug(ignore)]
+    tokenizer: T,
+    nodes: VecDeque<EagerTokenNode>,
+    useful_offset: u16,
+    num_useful_bytes: u16,
+    num_roots: u16,
+    ac_state: ACNodeId,
 }
 
 impl IncBpeTokenizer {
-    pub fn new(dict: NormalizedDict) -> Self {
-        let automaton = ACAutomaton::new(&dict);
-        let forest = SucForest::new(&dict);
-        let node_set = SufSucNodeSet::new(&forest, &automaton);
-        let trees = SufSucCentroidTrees::new(&node_set, &forest);
-        Self {
-            dict,
-            trans_table: automaton.trans_table,
-            ac_depths: automaton.depths,
-            forest,
-            node_set,
-            trees,
+    pub fn eager(&self) -> EagerBpeTokenization<&Self> {
+        EagerBpeTokenization {
+            tokenizer: self,
+            nodes: Default::default(),
+            useful_offset: 0,
+            num_useful_bytes: 0,
+            num_roots: 0,
+            ac_state: AC_NODE_ROOT,
         }
-    }
-
-    pub fn tokenize<I: IntoIterator<Item = TokenId>>(
-        &self,
-        token_ids: I,
-    ) -> IncBpeTokenization<&Self> {
-        let iter = token_ids.into_iter();
-        let mut state = self.tokenization();
-        state.reserve(iter.size_hint().0);
-        for token_id in iter {
-            state.feed(token_id);
-        }
-        state
-    }
-
-    pub fn tokenization(&self) -> IncBpeTokenization<&Self> {
-        IncBpeTokenization::new(self)
     }
 }
 
-impl<S> IncBpeTokenChainIter<S> {
-    pub fn pos(&self) -> usize {
-        self.pos
-    }
-
-    pub fn seq(&self) -> &S {
-        &self.seq
-    }
-}
-
-impl<S: Borrow<[IncBpeToken]>> IncBpeTokenChainIter<S> {
-    pub fn token_ids(self) -> impl Iterator<Item = TokenId> {
-        self.map(|(_, t)| t.token_id)
-    }
-}
-
-impl<S: Borrow<[IncBpeToken]>> Iterator for IncBpeTokenChainIter<S> {
-    type Item = (usize, IncBpeToken);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let seq: &[IncBpeToken] = self.seq.borrow();
-        let pos = self.pos;
-        if pos >= seq.len() {
-            return None;
+impl<T> From<EagerBpeTokenization<T>> for IncBpeTokenization<T> {
+    fn from(value: EagerBpeTokenization<T>) -> Self {
+        let capacity = value.nodes.len();
+        let mut forest_ids = Vec::with_capacity(capacity);
+        let mut tokens = Vec::with_capacity(capacity);
+        for node in value.nodes {
+            forest_ids.push(node.forest_id);
+            tokens.push(IncBpeToken::const_new(node.token_id, node.skip_len));
         }
-        let token = seq[pos];
-        let skip_len = token.skip_len as usize;
-        if skip_len <= pos {
-            self.pos -= skip_len;
-        } else {
-            self.pos = seq.len();
-        }
-        Some((pos, token))
+        Self::new_internal(value.tokenizer, value.ac_state, tokens, forest_ids)
     }
 }
 
-impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
-    pub fn feed(&mut self, token_id: TokenId) -> IncBpeToken {
+impl<T> EagerBpeTokenization<T> {
+    fn pop_prefix_removed_nodes(&mut self) {
+        while self.useful_offset > 0
+            && self
+                .nodes
+                .front()
+                .is_some_and(|i| i.num_alive_children == 0)
+        {
+            self.nodes.pop_front();
+            self.useful_offset -= 1;
+        }
+    }
+
+    fn move_forward_useful_offset(&mut self) {
+        debug_assert!(self.useful_offset as usize + 1 < self.nodes.len());
+        let mut idx = self.useful_offset;
+        self.useful_offset += 1;
+        self.num_useful_bytes -= self.nodes[idx as usize].feed_len;
+        loop {
+            let node = &self.nodes[idx as usize];
+            if node.num_alive_children != 0 || idx < node.skip_len {
+                if node.num_alive_children == 0 {
+                    debug_assert!(self.num_roots > 1);
+                    self.num_roots -= 1;
+                }
+                break;
+            }
+            idx -= node.skip_len;
+            self.nodes[idx as usize].num_alive_children -= 1;
+        }
+    }
+}
+
+impl<T: Borrow<IncBpeTokenizer>> EagerBpeTokenization<T> {
+    fn maintain_useful_offset(&mut self) {
         let tokenizer: &IncBpeTokenizer = self.tokenizer.borrow();
-        let (token, node_id) = if let Some(token) = tokenizer.get_token(token_id)
+        let target_useful_bytes = tokenizer.ac_depths[self.ac_state];
+        while self.useful_offset as usize + 1 < self.nodes.len()
+            && self.num_useful_bytes
+                > target_useful_bytes + self.nodes[self.useful_offset as usize].feed_len
+        {
+            self.move_forward_useful_offset();
+        }
+    }
+
+    fn push(&mut self, forest_id: ForestNodeId, feed_len: u16) {
+        let tokenizer: &IncBpeTokenizer = self.tokenizer.borrow();
+        let suc_node = &tokenizer.forest[forest_id];
+        let token_id = suc_node.token_id;
+        let skip_len = suc_node.skip_len;
+        if self.nodes.len() < skip_len as usize {
+            self.num_roots += 1;
+        } else {
+            let parent = self.nodes.len() - skip_len as usize;
+            self.nodes[parent].num_alive_children += 1;
+        }
+        self.num_useful_bytes += feed_len;
+        self.nodes.push_back(EagerTokenNode {
+            forest_id,
+            token_id,
+            feed_len,
+            skip_len,
+            num_alive_children: 0,
+        });
+    }
+}
+
+impl<T: Borrow<IncBpeTokenizer>> EagerBpeTokenization<T> {
+    pub fn feed(&mut self, token_id: TokenId) {
+        let tokenizer: &IncBpeTokenizer = self.tokenizer.borrow();
+        if let Some(token) = tokenizer.get_token(token_id)
             && tokenizer.is_useful(token_id)
         {
             #[cfg(debug_assertions)]
@@ -135,139 +139,145 @@ impl<T: Borrow<IncBpeTokenizer>> IncBpeTokenization<T> {
                 debug_assert_eq!(tokenizer.forest[node_id].skip_len, 1);
             }
             self.ac_state = tokenizer.trans_table.feed(self.ac_state, token);
+            let feed_len = token.len() as u16;
             let skip_to = |skip| {
-                let len = self.forest_ids.len();
+                let len = self.nodes.len();
                 if skip == 0 || skip > len {
                     FOREST_VIRTUAL_ROOT
                 } else {
-                    self.forest_ids[len - skip]
+                    self.nodes[len - skip].forest_id
                 }
             };
             let mut forest_id = tokenizer.node_set.longest_token_node[self.ac_state];
             debug_assert_ne!(forest_id, FOREST_VIRTUAL_ROOT);
             let node = &tokenizer.node_set[forest_id];
-            if (node.skip_len as usize) <= self.tokens.len() && !node.verify(skip_to) {
+            if (node.skip_len as usize) <= self.nodes.len() && !node.verify(skip_to) {
                 let tree = &tokenizer.trees[forest_id];
                 forest_id = tree.search(skip_to);
             }
-            let node = &tokenizer.forest[forest_id];
-            (IncBpeToken::new(node.token_id, node.skip_len), forest_id)
+            self.push(forest_id, feed_len);
+            self.maintain_useful_offset();
+            self.pop_prefix_removed_nodes();
         } else {
             self.ac_state = AC_NODE_ROOT;
-            (IncBpeToken::new(token_id, 1), FOREST_VIRTUAL_ROOT)
-        };
-        self.tokens.push(token);
-        self.forest_ids.push(node_id);
-        token
+            while self.useful_offset as usize + 1 < self.nodes.len() {
+                self.move_forward_useful_offset();
+            }
+            self.pop_prefix_removed_nodes();
+            if let Some(node) = self.nodes.back_mut() {
+                debug_assert_eq!(node.num_alive_children, 0);
+                debug_assert_eq!(self.num_roots, 1);
+                node.num_alive_children = 1;
+            } else {
+                debug_assert_eq!(self.num_roots, 0);
+                self.num_roots = 1;
+            }
+            self.useful_offset = self.nodes.len() as _;
+            self.num_useful_bytes = 0;
+            self.nodes.push_back(EagerTokenNode {
+                forest_id: FOREST_VIRTUAL_ROOT,
+                token_id,
+                skip_len: 1,
+                num_alive_children: 0,
+                feed_len: 0,
+            });
+        }
     }
 }
 
-impl<T> IncBpeTokenization<T> {
+impl<T> EagerBpeTokenization<T> {
     pub fn new(tokenizer: T) -> Self {
         Self {
             tokenizer,
+            nodes: Default::default(),
+            useful_offset: 0,
+            num_useful_bytes: 0,
+            num_roots: 0,
             ac_state: AC_NODE_ROOT,
-            tokens: Default::default(),
-            forest_ids: Default::default(),
-        }
-    }
-
-    pub(crate) fn new_internal(
-        tokenizer: T,
-        ac_state: ACNodeId,
-        tokens: Vec<IncBpeToken>,
-        forest_ids: Vec<ForestNodeId>,
-    ) -> Self {
-        Self {
-            tokenizer,
-            ac_state,
-            tokens,
-            forest_ids,
         }
     }
 
     pub fn reset(&mut self) {
-        self.tokens.clear();
-        self.forest_ids.clear();
+        self.nodes.clear();
+        self.useful_offset = 0;
+        self.num_useful_bytes = 0;
+        self.num_roots = 0;
         self.ac_state = AC_NODE_ROOT;
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        self.tokens.reserve(additional);
-        self.forest_ids.reserve(additional);
-    }
-
-    pub fn inc_tokens(&self) -> &[IncBpeToken] {
-        &self.tokens
+        self.nodes.reserve(additional);
     }
 
     pub fn tokenizer(&self) -> &T {
         &self.tokenizer
     }
+}
 
-    pub fn into_inner(self) -> (T, Vec<IncBpeToken>) {
-        (self.tokenizer, self.tokens)
-    }
+impl<T> Iterator for EagerBpeTokenization<T> {
+    type Item = EagerBpeToken;
 
-    pub fn into_inc_tokens(self) -> Vec<IncBpeToken> {
-        self.tokens
-    }
-
-    pub fn token_chain(&self, end_pos: usize) -> IncBpeTokenChainIter<&[IncBpeToken]> {
-        IncBpeTokenChainIter::new(&self.tokens, end_pos)
-    }
-
-    pub fn current_token_chain(&self) -> IncBpeTokenChainIter<&[IncBpeToken]> {
-        self.token_chain(self.tokens.len().saturating_sub(1))
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.num_roots != 1 {
+            return None;
+        }
+        self.pop_prefix_removed_nodes();
+        if self.useful_offset == 0 {
+            return None;
+        }
+        let EagerTokenNode {
+            forest_id: _,
+            feed_len,
+            token_id,
+            skip_len: _,
+            num_alive_children,
+        } = self.nodes.pop_front()?;
+        self.useful_offset -= 1;
+        self.num_roots = num_alive_children;
+        Some(EagerBpeToken { token_id, feed_len })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Borrow, sync::Arc};
-
     use crate::{
-        Dictionary, IncBpeToken, IncBpeTokenChainIter, IncBpeTokenizer, NormalizedDict, TokenId,
-        Vocab,
+        Dictionary, EagerBpeToken, IncBpeTokenizer, NormalizedDict, TokenId, Vocab,
         test_utils::{bpe_with_heap, bytes_into_tokens, utf8_into_tokens},
     };
 
-    fn inc_bpe_short_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
-        inc_bpe_short_case::<true>(vocab, rules, sequences);
-        inc_bpe_short_case::<false>(vocab, rules, sequences);
+    fn eager_bpe_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
+        eager_bpe_short_case::<true>(vocab, rules, sequences);
+        eager_bpe_short_case::<false>(vocab, rules, sequences);
     }
 
-    fn inc_bpe_short_case<const IN_BYTES: bool>(
+    fn eager_bpe_short_case<const IN_BYTES: bool>(
         vocab: &[&str],
         rules: &[(&str, &str)],
         sequences: &[&str],
     ) {
-        inc_bpe_case::<IN_BYTES, false>(vocab, rules, sequences);
+        eager_bpe_case::<IN_BYTES, false>(vocab, rules, sequences);
     }
 
-    fn inc_bpe_display_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
-        inc_bpe_display_case::<true>(vocab, rules, sequences);
-        inc_bpe_display_case::<false>(vocab, rules, sequences);
+    fn eager_bpe_display_any_case(vocab: &[&str], rules: &[(&str, &str)], sequences: &[&str]) {
+        eager_bpe_display_case::<true>(vocab, rules, sequences);
+        eager_bpe_display_case::<false>(vocab, rules, sequences);
     }
 
-    fn inc_bpe_display_case<const IN_BYTES: bool>(
+    fn eager_bpe_display_case<const IN_BYTES: bool>(
         vocab: &[&str],
         rules: &[(&str, &str)],
         sequences: &[&str],
     ) {
-        inc_bpe_case::<IN_BYTES, true>(vocab, rules, sequences);
+        eager_bpe_case::<IN_BYTES, true>(vocab, rules, sequences);
     }
 
-    fn validate(dict: &Dictionary, seq: &[TokenId], inc_res: &[IncBpeToken]) {
-        for i in 0..seq.len() {
-            let expected = bpe_with_heap::<false>(dict, &seq[0..i + 1]);
-            let output = IncBpeTokenChainIter::new(inc_res, i).token_ids();
-            let output = output.chain(std::iter::repeat(TokenId::MAX));
-            assert!(expected.into_iter().rev().zip(output).all(|(i, j)| i == j));
-        }
+    fn validate(dict: &Dictionary, seq: &[TokenId], eager_res: &[EagerBpeToken]) {
+        let expected = bpe_with_heap::<false>(dict, seq);
+        let output: Vec<_> = eager_res.iter().map(|&t| t.token_id).collect();
+        assert_eq!(output, expected);
     }
 
-    fn inc_bpe_case<const IN_BYTES: bool, const DISPLAY: bool>(
+    fn eager_bpe_case<const IN_BYTES: bool, const DISPLAY: bool>(
         vocab: &[&str],
         rules: &[(&str, &str)],
         sequences: &[&str],
@@ -289,14 +299,29 @@ mod tests {
             } else {
                 utf8_into_tokens(&tokenizer, s, 0usize)
             };
-            let res = tokenizer
-                .tokenize(single_tokens.iter().copied())
-                .into_inc_tokens();
-            validate(&tokenizer, &single_tokens, &res);
-            res
+
+            let mut state = tokenizer.eager();
+            let mut output = Vec::new();
+            for token_id in std::iter::chain(single_tokens.iter().copied(), [TokenId::MAX]) {
+                state.feed(token_id);
+                output.extend(&mut state);
+            }
+
+            let mut batch_state = tokenizer.eager();
+            let mut batch_output = Vec::new();
+            for token_ids in std::iter::chain(single_tokens.chunks(4), [TokenId::MAX].chunks(1)) {
+                for token_id in token_ids.iter().copied() {
+                    batch_state.feed(token_id);
+                }
+                batch_output.extend(&mut batch_state);
+            }
+            assert_eq!(output, batch_output);
+
+            validate(&tokenizer, &single_tokens, &output);
+            output
         };
 
-        let display_res = |res: &[IncBpeToken]| {
+        let display_res = |res: &[EagerBpeToken]| {
             if DISPLAY {
                 let msg = String::from_iter(res.iter().map(|t| {
                     let token = str::from_utf8(&tokenizer[t.token_id]).unwrap();
@@ -313,8 +338,8 @@ mod tests {
     }
 
     #[test]
-    fn test_inc_bpe_unk_tokens() {
-        inc_bpe_display_any_case(
+    fn test_eager_bpe_unk_tokens() {
+        eager_bpe_display_any_case(
             &["", "a", "b", "ab", "ba", "aa"],
             &[("a", "b"), ("b", "a"), ("a", "a")],
             &["acbacbcabbacaaaaaacccabaccabca", "ccc", "c", ""],
@@ -322,12 +347,12 @@ mod tests {
     }
 
     #[test]
-    fn test_inc_bpe_short() {
+    fn test_eager_bpe_short() {
         let vocab = [
             "", "a", "abc", "abcde", "abcdef", "b", "ba", "bc", "bcdef", "c", "cd", "cde", "cdefg",
             "d", "de", "def", "e", "ef", "efg", "f", "g",
         ];
-        inc_bpe_display_any_case(
+        eager_bpe_display_any_case(
             &vocab,
             &[
                 ("b", "c"),
@@ -346,7 +371,7 @@ mod tests {
             ],
             &["abcdefg", "babcdefg", "cdefg"],
         );
-        inc_bpe_display_any_case(
+        eager_bpe_display_any_case(
             &vocab,
             &[
                 ("b", "c"),
@@ -371,13 +396,13 @@ mod tests {
         let seq = [
             "a", "aa", "aaa", "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", "aaaaaaaa",
         ];
-        inc_bpe_short_any_case(&vocab, &rules, &seq);
+        eager_bpe_any_case(&vocab, &rules, &seq);
         let rules = [("a", "a"), ("aa", "aa"), ("aa", "a"), ("aaaa", "a")];
-        inc_bpe_short_any_case(&vocab, &rules, &seq);
+        eager_bpe_any_case(&vocab, &rules, &seq);
         let rules = [("a", "a")];
-        inc_bpe_display_any_case(&vocab, &rules, &seq);
+        eager_bpe_display_any_case(&vocab, &rules, &seq);
         let rules = [("a", "a"), ("a", "aa")];
-        inc_bpe_short_any_case(&vocab, &rules, &seq);
+        eager_bpe_any_case(&vocab, &rules, &seq);
 
         for i in 1..6 {
             let mut vocab = vec!["<unk>".to_owned()];
@@ -395,7 +420,7 @@ mod tests {
                     .enumerate()
                     .filter_map(|(k, &v)| if (j & (1 << k)) != 0 { Some(v) } else { None })
                     .collect();
-                inc_bpe_short_any_case(&vocab, &rules, &seq);
+                eager_bpe_any_case(&vocab, &rules, &seq);
             }
         }
 
@@ -416,13 +441,13 @@ mod tests {
             }
         }
         let multiple_a_s: Vec<_> = multiple_a_s.iter().map(|s| s.as_str()).collect();
-        inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
+        eager_bpe_any_case(&vocab, &rules, &multiple_a_s);
         let rules = [("a", "a"), ("aa", "aa"), ("aa", "a"), ("aaaa", "a")];
-        inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
+        eager_bpe_any_case(&vocab, &rules, &multiple_a_s);
         let rules = [("a", "a")];
-        inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
+        eager_bpe_any_case(&vocab, &rules, &multiple_a_s);
         let rules = [("a", "a"), ("a", "aa")];
-        inc_bpe_short_any_case(&vocab, &rules, &multiple_a_s);
+        eager_bpe_any_case(&vocab, &rules, &multiple_a_s);
 
         let vocab = [
             "",
@@ -442,17 +467,17 @@ mod tests {
             "aa",
             "aaa",
         ];
-        inc_bpe_short_any_case(
+        eager_bpe_any_case(
             &vocab,
             &[("c", "d"), ("b", "cd"), ("a", "bcd")],
             &["dcdbcdabcdab"],
         );
-        inc_bpe_short_case::<false>(
+        eager_bpe_short_case::<false>(
             &vocab,
             &[("你", "好")],
             &["你好", "你好呀", "你好你好你好呀你好你好你"],
         );
-        inc_bpe_short_case::<false>(
+        eager_bpe_short_case::<false>(
             &vocab,
             &[("你", "好"), ("你好", "呀")],
             &["你好", "你好呀", "你好你好你好呀你好你好你", "", "你"],
@@ -463,7 +488,7 @@ mod tests {
             [("你", "好"), ("好", "你"), ("你好", "呀")],
             [("好", "你"), ("你", "好"), ("你好", "呀")],
         ] {
-            inc_bpe_short_case::<false>(&vocab, &rules, &seq);
+            eager_bpe_short_case::<false>(&vocab, &rules, &seq);
         }
 
         for rules in [
@@ -472,12 +497,12 @@ mod tests {
             &[("a", "a"), ("a", "aa")],
             &[("aa", "a"), ("a", "a")],
         ] {
-            inc_bpe_short_any_case(&vocab, rules, &multiple_a_s);
+            eager_bpe_any_case(&vocab, rules, &multiple_a_s);
         }
     }
 
     #[test]
-    fn test_inc_bpe_non_longest() {
+    fn test_eager_bpe_non_longest() {
         let vocab = [
             "", "a", "b", "c", "d", "e", "f", "g", "h", "i", "ab", "ba", "bc", "cd", "de", "ef",
             "gh", "hi", "cde", "ghi", "fghi", "abcd", "fg", "efgh", "efghi", "bcd", "defgh",
@@ -529,10 +554,10 @@ mod tests {
                     .all(|id| normalized.is_useful(id))
             );
         }
-        inc_bpe_display_any_case(&vocab, &rules, &sequences);
+        eager_bpe_display_any_case(&vocab, &rules, &sequences);
     }
 
-    fn inc_bpe_demo_case(rules: &[(&str, &str)]) {
+    fn eager_bpe_demo_case(rules: &[(&str, &str)]) {
         let vocab = Vocab::new([
             b"" as &[_],
             b"a",
@@ -561,12 +586,17 @@ mod tests {
         let dict = Dictionary::new_from_token_pair(vocab, rules.iter().copied()).unwrap();
         let tokenizer = IncBpeTokenizer::new(NormalizedDict::new_in_bytes(dict).unwrap());
         let tokenize = |s| {
-            tokenizer
-                .tokenize(bytes_into_tokens(&tokenizer, s, 0usize))
-                .into_inc_tokens()
+            let init_token_seq = bytes_into_tokens(&tokenizer, s, 0usize);
+            let mut tokenization = tokenizer.eager();
+            let mut res = Vec::new();
+            for token_id in std::iter::chain(init_token_seq, [TokenId::MAX]) {
+                tokenization.feed(token_id);
+                res.extend(&mut tokenization);
+            }
+            res
         };
 
-        let display_res = |res: &[IncBpeToken]| {
+        let display_res = |res: &[EagerBpeToken]| {
             let msg = String::from_iter(res.iter().map(|t| {
                 let token = str::from_utf8(&tokenizer[t.token_id]).unwrap();
                 format!("[{token} ({})], ", t.token_id)
@@ -584,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn test_inc_bpe_non_vocab_token() {
+    fn test_eager_bpe_non_vocab_token() {
         let vocab = Vocab::new(["a", "aa"]).unwrap();
         let avail_token_ids = [0, 2, 3, TokenId::MAX.inner()].map(TokenId::new);
         for rules in [&[] as &[_], &[(0usize, 0usize)]] {
@@ -595,9 +625,12 @@ mod tests {
                     let token_ids: Vec<_> = (0..len)
                         .map(|i| avail_token_ids[(seq >> (i * 2)) & 3])
                         .collect();
-                    let res = tokenizer
-                        .tokenize(token_ids.iter().copied())
-                        .into_inc_tokens();
+                    let mut tokenization = tokenizer.eager();
+                    let mut res = Vec::new();
+                    for token_id in std::iter::chain(token_ids.iter().copied(), [TokenId::MAX]) {
+                        tokenization.feed(token_id);
+                        res.extend(&mut tokenization);
+                    }
                     validate(&tokenizer, &token_ids, &res);
                 }
             }
@@ -605,8 +638,8 @@ mod tests {
     }
 
     #[test]
-    fn test_inc_bpe_demo() {
-        inc_bpe_demo_case(&[
+    fn test_eager_bpe_demo() {
+        eager_bpe_demo_case(&[
             ("b", "c"),
             ("e", "f"),
             ("d", "e"),
@@ -621,7 +654,7 @@ mod tests {
             ("ef", "g"),
             ("cd", "efg"),
         ]);
-        inc_bpe_demo_case(&[
+        eager_bpe_demo_case(&[
             ("b", "c"),
             ("e", "f"),
             ("d", "e"),
@@ -638,60 +671,14 @@ mod tests {
         ]);
     }
 
-    fn verify_chain_iter(
-        chain: impl Borrow<[IncBpeToken]> + Clone,
-        seqs: impl IntoIterator<Item = impl IntoIterator<Item = impl Into<TokenId>>>,
-    ) {
-        for (end_pos, seq) in seqs.into_iter().enumerate() {
-            let expected: Vec<_> = seq.into_iter().map(|i| i.into()).collect();
-            let iter = IncBpeTokenChainIter::new(chain.clone(), end_pos);
-            let output: Vec<_> = iter.map(|(_, i)| i.token_id).collect();
-            assert_eq!(output, expected);
-        }
-    }
-
     #[test]
-    fn test_inc_bpe_chain_iter_box() {
-        let chain_base = [
-            IncBpeToken::new(1u32, 1),
-            IncBpeToken::new(2u32, 1),
-            IncBpeToken::new(3u32, 2),
-            IncBpeToken::new(4u32, 2),
-            IncBpeToken::new(5u32, 1),
-            IncBpeToken::new(6u32, 3),
-        ];
-
-        let expected = [
-            &[1u32] as &[u32],
-            &[2, 1],
-            &[3, 1],
-            &[4, 2, 1],
-            &[5, 4, 2, 1],
-            &[6, 3, 1],
-        ];
-        let build_seq = || expected.iter().map(|&s| s.iter().copied());
-
-        verify_chain_iter(&chain_base as &[IncBpeToken], build_seq());
-        verify_chain_iter(chain_base, build_seq());
-
-        let chain: Vec<IncBpeToken> = Vec::from(chain_base);
-        verify_chain_iter(chain, build_seq());
-
-        let chain: Box<[IncBpeToken]> = Box::from(chain_base);
-        verify_chain_iter(chain, build_seq());
-
-        let chain: Arc<[IncBpeToken]> = Arc::from(chain_base);
-        verify_chain_iter(chain, build_seq());
-    }
-
-    #[test]
-    fn test_inc_bpe_repeated() {
+    fn test_eager_bpe_repeated() {
         let vocab: Vec<String> = ["".to_owned()]
             .into_iter()
             .chain((1..=32).map(|i| std::iter::repeat_n('a', i).collect()))
             .collect();
         let vocab_ref: Vec<_> = vocab.iter().map(|s| s.as_ref()).collect();
-        inc_bpe_display_any_case(
+        eager_bpe_display_any_case(
             &vocab_ref[..18],
             &[
                 ("a", "a"),
